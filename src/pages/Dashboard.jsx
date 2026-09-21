@@ -36,7 +36,7 @@ import {
   ComposedChart,
   ReferenceLine,
 } from "recharts";
-
+import { productosDashboard, categoriasDashboard } from '../data/inventarioReal';
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
   bg:         "#F5F3EF",
@@ -131,7 +131,7 @@ const CustomTooltip = ({ active, payload, label, prefix = "" }) => {
 };
 
 // ─── DASHBOARD ─────────────────────────────────────────────────────────────────
-export default function Dashboard({ products = [], categories = [], onNavigate }) {
+export default function Dashboard({ products = productosDashboard, categories = categoriasDashboard, onNavigate }) {
   const [activeChart, setActiveChart] = useState("valorInventario");
 
   // ── Métricas derivadas ────────────────────────────────────────────────────────
@@ -141,7 +141,7 @@ export default function Dashboard({ products = [], categories = [], onNavigate }
     const totalSoldMonth  = products.reduce((s, p) => s + p.unitsSoldThisMonth, 0);
     const totalSoldLast   = products.reduce((s, p) => s + p.unitsSoldLastMonth, 0);
     const revenueMonth    = products.reduce((s, p) => s + p.unitsSoldThisMonth * p.price, 0);
-    const revenueLast     = products.reduce((s, p) => s + p.unitsSoldLastMonth * p.price, 0);
+    const revenueLast     = products.reduce((s, p) => s + p.unitsSoldLastMonth, 0);
     const lowStockItems   = products.filter(p => p.stock <= p.minStock);
     const criticalItems   = products.filter(p => p.stock === 0);
     const turnoverRate    = totalValue > 0 ? ((revenueMonth / totalValue) * 100).toFixed(1) : 0;
@@ -425,9 +425,9 @@ export default function Dashboard({ products = [], categories = [], onNavigate }
         </div>
 
         {/* Gráfico: Rotación por Categoría (Barras horizontales) */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px", display: "flex", flexDirection: "column" }}>
           <ChartHeader icon={Activity} title="Tasa de Rotación" sub="Ventas / Stock disponible (%)" />
-          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ marginTop: 12, flex: 1, maxHeight: 200, overflowY: "auto", paddingRight: 6, display: "flex", flexDirection: "column", gap: 8 }}>
             {metrics.categoryMetrics
               .sort((a, b) => parseFloat(b.rotacion) - parseFloat(a.rotacion))
               .map(cat => (
@@ -643,14 +643,14 @@ function ChartHeader({ icon: Icon, title, sub }) {
 function RotationBar({ name, value, max }) {
   const pctWidth = max > 0 ? (value / max) * 100 : 0;
   const color = value >= 50 ? C.success : value >= 25 ? C.warning : C.danger;
-  const shortName = name.length > 12 ? name.slice(0, 12) + "…" : name;
+  const shortName = name.length > 14 ? name.slice(0, 14) + "…" : name;
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <span style={{ fontFamily: FONT.body, fontSize: 11, color: C.inkSecond, fontWeight: 500 }}>{shortName}</span>
-        <span style={{ fontFamily: FONT.body, fontSize: 11, fontWeight: 700, color }}>{value}%</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+        <span style={{ fontFamily: FONT.body, fontSize: 12, color: C.inkSecond, fontWeight: 500 }}>{shortName}</span>
+        <span style={{ fontFamily: FONT.body, fontSize: 12, fontWeight: 700, color }}>{value}%</span>
       </div>
-      <div style={{ height: 6, background: C.borderFaint, borderRadius: 3, overflow: "hidden" }}>
+      <div style={{ height: 5, background: C.borderFaint, borderRadius: 3, overflow: "hidden" }}>
         <div style={{
           height: "100%", width: `${pctWidth}%`, background: color,
           borderRadius: 3, transition: "width 0.6s ease",

@@ -5,6 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import Productos from "./pages/Productos";
 import Prediccion from "./pages/Prediccion";
 import Vision from "./pages/Vision";
+import { productosDashboard, categoriasDashboard } from "./data/inventarioReal";
 
 export const CATEGORY_SEED = [
   { id: "c1", name: "Laptops" },
@@ -56,8 +57,8 @@ export const MOVEMENT_HISTORY = [
 
 export default function App() {
   const [activePage, setActivePage] = useState("dashboard");
-  const [products, setProducts] = useState(PRODUCT_SEED);
-  const [categories, setCategories] = useState(CATEGORY_SEED);
+  const [products, setProducts] = useState(productosDashboard);
+  const [categories, setCategories] = useState(categoriasDashboard);
 
   const handleAddProduct    = (data) => setProducts([...products, { ...data, id: Date.now(), unitsSoldLastMonth: 0, unitsSoldThisMonth: 0 }]);
   const handleEditProduct   = (id, data) => setProducts(products.map(p => p.id === id ? { ...p, ...data } : p));
