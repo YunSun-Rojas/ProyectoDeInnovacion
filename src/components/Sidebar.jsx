@@ -9,6 +9,10 @@ import {
   LogOut, 
   PackageCheck 
 } from "lucide-react";
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '../services/supabase'
+
+
 
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutGrid },
@@ -20,6 +24,19 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar({ activePage, setActivePage }) {
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut()
+
+    if (error) {
+      console.error('Error al cerrar sesión:', error.message)
+      return
+    }
+
+  navigate('/login', { replace: true })
+}
+
   return (
     <aside style={{
       width: 240,
@@ -92,20 +109,20 @@ export default function Sidebar({ activePage, setActivePage }) {
       {/* Footer / Logout */}
       <div style={{ borderTop: "1px solid #232329", paddingTop: 16 }}>
         <button
-          onClick={() => alert("Cerrando sesión...")}
+          onClick={handleLogout}
           style={{
-            display: "flex",
-            alignItems: "center",
+            display: 'flex',
+            alignItems: 'center',
             gap: 12,
-            width: "100%",
-            padding: "10px 14px",
+            width: '100%',
+            padding: '10px 14px',
             borderRadius: 8,
-            border: "none",
-            background: "transparent",
-            color: "#8B8985",
-            fontFamily: "Inter, sans-serif",
+            border: 'none',
+            background: 'transparent',
+            color: '#8B8985',
+            fontFamily: 'Inter, sans-serif',
             fontSize: 14,
-            cursor: "pointer"
+            cursor: 'pointer',
           }}
         >
           <LogOut size={18} /> Cerrar Sesión

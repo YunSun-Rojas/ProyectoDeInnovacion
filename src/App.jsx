@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import Productos from "./pages/Productos";
 import Prediccion from "./pages/Prediccion";
 import Vision from "./pages/Vision";
+import { AdminRoute } from './components/AdminRoute'
 import {
   productosDashboard,
   categoriasDashboard,
@@ -116,7 +117,7 @@ function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/dashboard/*" element={<DashboardApp />} />
+      <Route path="/dashboard/*" element={ <AdminRoute> <DashboardApp > </DashboardApp> </AdminRoute>} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
