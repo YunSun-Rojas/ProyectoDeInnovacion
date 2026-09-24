@@ -1,5 +1,5 @@
-import { ImageCarousel } from '../components/ui/ImageCarousel'
-import { LoginForm } from '../components/ui/LoginForm'
+import { ImageCarousel } from '../components/ImageCarousel'
+import { LoginForm } from '../components/LoginForm'
 
 export function LoginPage() {
   return (

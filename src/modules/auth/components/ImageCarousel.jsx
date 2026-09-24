@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 
-import img1 from '../../assets/gamer-chair-with-multicolored-neon-lights.jpg'
-import img2 from '../../assets/modern-monitor-elegant-table.jpg'
-import img3 from '../../assets/pexels-sulimansallehi-758532.jpg'
-import img4 from '../../assets/pexels-umudicreative-31862215.jpg'
-import img5 from '../../assets/technology-integrated-everyday-life.jpg'
+import img1 from '../../../assets/gamer-chair-with-multicolored-neon-lights.jpg'
+import img2 from '../../../assets/modern-monitor-elegant-table.jpg'
+import img3 from '../../../assets/pexels-sulimansallehi-758532.jpg'
+import img4 from '../../../assets/pexels-umudicreative-31862215.jpg'
+import img5 from '../../../assets/technology-integrated-everyday-life.jpg'
 
 const SLIDES = [
   { url: img1, alt: 'Silla gamer con luces de neón' },
