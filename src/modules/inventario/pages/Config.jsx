@@ -3,15 +3,18 @@ import { useOutletContext } from 'react-router-dom';
 import { Building2, UserRound, KeyRound, Moon, ChevronRight, Pencil, Palette } from 'lucide-react';
 import s from './Management.module.css';
 import { useAuthSession } from '../../auth/services/useAuthSession';
+import AccountDialog from '../components/AccountDialog';
 
 const description = 'Eagle Gaming Perú es una empresa dedicada a la venta de productos de tecnología y gaming. Importamos las mejores marcas del mercado para ofrecer a nuestros clientes lo último en hardware. Nos destacamos por nuestra variedad de productos, precios competitivos y un fuerte compromiso con la calidad y el servicio al cliente.';
 
 export default function Config() {
-  const { settings, setSettings } = useOutletContext();
+  const { settings, setSettings, darkMode, toggleDarkMode, themeError } = useOutletContext();
   const { session, loading } = useAuthSession();
   const user = session?.user;
   const [draft, setDraft] = useState(null);
   const [message, setMessage] = useState('');
+  const [accountMode, setAccountMode] = useState(null);
+  const [accountMessage, setAccountMessage] = useState('');
   const updateDraft = (event) => setDraft(previous => ({ ...previous, [event.target.name]: event.target.value }));
   const saveCompany = (event) => {
     event.preventDefault();
@@ -83,11 +86,12 @@ export default function Config() {
         <section className={s.card}>
           <h2 className={s.sectionTitle}><UserRound size={21} color="#E71950" /> Mi cuenta</h2>
           <div className={s.accountSummary}><strong>{loading ? 'Cargando cuenta…' : user?.email || 'Sesión no disponible'}</strong></div>
+          {accountMessage && <p className={s.muted} role="status">{accountMessage}</p>}
           <div className={s.accountOptions}>
-            <button type="button" disabled className={s.accountOption}>
+            <button type="button" disabled={!user || loading} className={s.accountOption} onClick={() => { setAccountMessage(''); setAccountMode('profile'); }}>
               <UserRound size={20} /><span>Personalización de perfil</span><ChevronRight size={18} />
             </button>
-            <button type="button" disabled className={s.accountOption}>
+            <button type="button" disabled={!user || loading} className={s.accountOption} onClick={() => { setAccountMessage(''); setAccountMode('password'); }}>
               <KeyRound size={20} /><span>Cambiar contraseña</span><ChevronRight size={18} />
             </button>
           </div>
@@ -95,13 +99,15 @@ export default function Config() {
         <section className={s.card}>
           <h2 className={s.sectionTitle}><Palette size={21} color="#E71950" /> Apariencia</h2>
           <div className={s.accountOptions}>
-            <button type="button" disabled className={s.accountOption} title="Próximamente disponible">
+            <button type="button" className={s.accountOption} role="switch" aria-checked={darkMode} onClick={toggleDarkMode}>
               <Moon size={20} /><span>Modo oscuro</span><span className={s.previewSwitch} aria-hidden="true" />
             </button>
           </div>
-
+          {themeError && <p className={s.formError} role="status">{themeError}</p>}
         </section>
       </div>
+      {accountMode && user && <AccountDialog key={`${user.id}-${accountMode}`} mode={accountMode} user={user}
+        onDismiss={() => setAccountMode(null)} onSaved={text => { setAccountMessage(text); setAccountMode(null); }} />}
     </div>
   );
 }

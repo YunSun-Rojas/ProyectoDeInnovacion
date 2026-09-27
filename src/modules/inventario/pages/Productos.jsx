@@ -3,19 +3,19 @@ import { useSearchParams } from "react-router-dom";
 import { Search, Plus, Pencil, Trash2, X } from "lucide-react";
 
 const COLORS = {
-  bg: "#F1F5F9",
-  cardBg: "#FFFFFF",
-  ink: "#1F2937",
-  muted: "#64748B",
-  border: "#E5E7EB",
+  bg: "var(--inventory-bg, #F1F5F9)",
+  cardBg: "var(--inventory-surface, #FFFFFF)",
+  ink: "var(--inventory-ink, #1F2937)",
+  muted: "var(--inventory-muted, #64748B)",
+  border: "var(--inventory-border, #E5E7EB)",
   accent: "#E32636",
-  accentTint: "#FBE6E7",
-  success: "#2F7D4F",
-  successTint: "#E4F2E9",
-  warning: "#B4700B",
-  warningTint: "#FBEBD4",
-  danger: "#8F1B26",
-  dangerTint: "#FBE6E7"
+  accentTint: "var(--inventory-accent-tint, #FBE6E7)",
+  success: "var(--inventory-success, #2F7D4F)",
+  successTint: "var(--inventory-success-tint, #E4F2E9)",
+  warning: "var(--inventory-warning, #B4700B)",
+  warningTint: "var(--inventory-warning-tint, #FBEBD4)",
+  danger: "var(--inventory-danger, #8F1B26)",
+  dangerTint: "var(--inventory-accent-tint, #FBE6E7)"
 };
 
 export default function Productos({ products, categories, onAdd, onEdit, onDelete, onAdjustStock, defaultMinStock = 5 }) {
@@ -151,9 +151,9 @@ export default function Productos({ products, categories, onAdd, onEdit, onDelet
                   <td style={{ padding: "14px 20px", color: COLORS.ink }}>{p.category}</td>
                   <td style={{ padding: "14px 20px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <button onClick={() => onAdjustStock(p.id, -1)} style={{ border: `1px solid ${COLORS.border}`, background: "#FFF", borderRadius: 4, width: 26, height: 26, cursor: "pointer" }}>-</button>
+                      <button onClick={() => onAdjustStock(p.id, -1)} style={{ border: `1px solid ${COLORS.border}`, background: "var(--inventory-surface, #FFF)", borderRadius: 4, width: 26, height: 26, cursor: "pointer" }}>-</button>
                       <span style={{ fontWeight: 600, minWidth: 24, textAlign: "center" }}>{p.stock}</span>
-                      <button onClick={() => onAdjustStock(p.id, 1)} style={{ border: `1px solid ${COLORS.border}`, background: "#FFF", borderRadius: 4, width: 26, height: 26, cursor: "pointer" }}>+</button>
+                      <button onClick={() => onAdjustStock(p.id, 1)} style={{ border: `1px solid ${COLORS.border}`, background: "var(--inventory-surface, #FFF)", borderRadius: 4, width: 26, height: 26, cursor: "pointer" }}>+</button>
                     </div>
                   </td>
                   <td style={{ padding: "14px 20px", fontWeight: 500 }}>S/. {p.price.toFixed(2)}</td>
@@ -207,7 +207,7 @@ function ProductModal({ initialData, categories, onClose, onSave, defaultMinStoc
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-      <div style={{ background: "#FFF", borderRadius: 12, padding: 28, width: 420, maxWidth: "90%" }}>
+      <div style={{ background: "var(--inventory-surface, #FFF)", borderRadius: 12, padding: 28, width: 420, maxWidth: "90%" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h2 style={{ margin: 0, fontFamily: "Oswald, sans-serif", fontSize: 22 }}>{initialData ? "Editar Producto" : "Nuevo Producto"}</h2>
           <button onClick={onClose} style={{ border: "none", background: "none", cursor: "pointer" }}><X size={20} /></button>
@@ -216,31 +216,31 @@ function ProductModal({ initialData, categories, onClose, onSave, defaultMinStoc
         <div style={{ display: "flex", flexDirection: "column", gap: 14, fontFamily: "Inter, sans-serif", fontSize: 13 }}>
           <div>
             <label style={{ fontWeight: 600, display: "block", marginBottom: 4 }}>Nombre</label>
-            <input style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E5E7EB", boxSizing: "border-box" }} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--inventory-border, #E5E7EB)", boxSizing: "border-box" }} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
           <div>
             <label style={{ fontWeight: 600, display: "block", marginBottom: 4 }}>SKU</label>
-            <input style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E5E7EB", boxSizing: "border-box" }} value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+            <input style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--inventory-border, #E5E7EB)", boxSizing: "border-box" }} value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
           </div>
           <div>
             <label style={{ fontWeight: 600, display: "block", marginBottom: 4 }}>Categoría</label>
-            <select style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E5E7EB" }} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+            <select style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--inventory-border, #E5E7EB)" }} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
               {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontWeight: 600, display: "block", marginBottom: 4 }}>Stock</label>
-              <input type="number" style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E5E7EB", boxSizing: "border-box" }} value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} />
+              <input type="number" style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--inventory-border, #E5E7EB)", boxSizing: "border-box" }} value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} />
             </div>
             <div style={{ flex: 1 }}>
               <label style={{ fontWeight: 600, display: "block", marginBottom: 4 }}>Mínimo</label>
-              <input type="number" style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E5E7EB", boxSizing: "border-box" }} value={form.minStock} onChange={(e) => setForm({ ...form, minStock: Number(e.target.value) })} />
+              <input type="number" style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--inventory-border, #E5E7EB)", boxSizing: "border-box" }} value={form.minStock} onChange={(e) => setForm({ ...form, minStock: Number(e.target.value) })} />
             </div>
           </div>
           <div>
             <label style={{ fontWeight: 600, display: "block", marginBottom: 4 }}>Precio (S/.)</label>
-            <input type="number" style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E5E7EB", boxSizing: "border-box" }} value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
+            <input type="number" style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--inventory-border, #E5E7EB)", boxSizing: "border-box" }} value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
           </div>
 
           <button onClick={() => onSave(form)} style={{ marginTop: 10, background: "#E32636", color: "#FFF", border: "none", padding: "12px", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>

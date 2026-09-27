@@ -109,3 +109,27 @@ body {
   .dashboard-heading h1 { font-size: 26px !important; }
   .dashboard-mini > div:last-child { max-width: 100% !important; }
 }
+
+/* Color overrides only: existing inventory dimensions and layout are preserved. */
+.inventory-shell[data-theme="dark"] {
+  color-scheme: dark;
+  color: #f1f1f1;
+  --inventory-ink-second: #d4d4d4;
+  --inventory-bg: #0f0f0f;
+  --inventory-surface: #161616;
+  --inventory-surface-alt: #1b1b1b;
+  --inventory-ink: #f1f1f1;
+  --inventory-muted: #aaaaaa;
+  --inventory-border: #2b2b2b;
+  --inventory-border-faint: #232323;
+  --inventory-input-border: #404040;
+  --inventory-accent-tint: #452435;
+  --inventory-success-tint: #193c31;
+  --inventory-warning-tint: #49361d;
+  --inventory-danger-tint: #452435;
+  --inventory-info-tint: #17384d;
+  --inventory-success: #86efac;
+  --inventory-warning: #fcd34d;
+  --inventory-danger: #fda4af;
+  --inventory-info: #7dd3fc;
+}

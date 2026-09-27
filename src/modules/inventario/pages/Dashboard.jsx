@@ -35,25 +35,25 @@ import {
 import { productosDashboard, categoriasDashboard } from '../data/inventarioReal';
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
-  bg:         "#F1F5F9",
-  surface:    "#FFFFFF",
-  surfaceAlt: "#FAFAF8",
-  ink:        "#12121A",
-  inkSecond:  "#454550",
-  muted:      "#8A8880",
-  border:     "#E5E1D8",
-  borderFaint:"#EFECE6",
+  bg:         "var(--inventory-bg, #F1F5F9)",
+  surface:    "var(--inventory-surface, #FFFFFF)",
+  surfaceAlt: "var(--inventory-surface-alt, #FAFAF8)",
+  ink:        "var(--inventory-ink, #12121A)",
+  inkSecond:  "var(--inventory-ink-second, #454550)",
+  muted:      "var(--inventory-muted, #8A8880)",
+  border:     "var(--inventory-border, #E5E1D8)",
+  borderFaint:"var(--inventory-border-faint, #EFECE6)",
   accent:     "#D62839",
-  accentTint: "#FBE6E8",
+  accentTint: "var(--inventory-accent-tint, #FBE6E8)",
   accentGlow: "rgba(214,40,57,0.12)",
-  success:    "#1E8A4C",
-  successTint:"#E3F5EB",
-  warning:    "#C07D0A",
-  warningTint:"#FEF0D3",
-  danger:     "#991B2A",
-  dangerTint: "#FDEAEC",
-  info:       "#1A6FAB",
-  infoTint:   "#E0F0FA",
+  success:    "var(--inventory-success, #1E8A4C)",
+  successTint:"var(--inventory-success-tint, #E3F5EB)",
+  warning:    "var(--inventory-warning, #C07D0A)",
+  warningTint:"var(--inventory-warning-tint, #FEF0D3)",
+  danger:     "var(--inventory-danger, #991B2A)",
+  dangerTint: "var(--inventory-danger-tint, #FDEAEC)",
+  info:       "var(--inventory-info, #1A6FAB)",
+  infoTint:   "var(--inventory-info-tint, #E0F0FA)",
 };
 
 const FONT = { heading: "Oswald, sans-serif", body: "Inter, system-ui, sans-serif" };
@@ -224,8 +224,8 @@ export default function Dashboard({ products = productosDashboard, categories = 
             Sistema de Gestión de Inventario Inteligente · Eagle Gaming
           </p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.successTint, border: `1px solid ${C.success}30`, borderRadius: 20, padding: "6px 14px" }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.success, boxShadow: `0 0 0 3px ${C.success}30` }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.successTint, border: `1px solid color-mix(in srgb, ${C.success} 19%, transparent)`, borderRadius: 20, padding: "6px 14px" }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.success, boxShadow: `0 0 0 3px color-mix(in srgb, ${C.success} 19%, transparent)` }} />
           <span style={{ fontFamily: FONT.body, fontSize: 12, fontWeight: 600, color: C.success }}>Sistema Activo</span>
         </div>
       </div>
@@ -620,10 +620,10 @@ function MiniStatCard({ to, title, value, desc, icon: Icon, color, hint }) {
 
 function InsightPill({ icon, text, type }) {
   const colors = {
-    danger:  { bg: C.dangerTint,  border: C.danger  + "44", text: C.danger },
-    success: { bg: C.successTint, border: C.success + "44", text: C.success },
-    warning: { bg: C.warningTint, border: C.warning + "44", text: C.warning },
-    info:    { bg: C.infoTint,    border: C.info    + "44", text: C.info },
+    danger:  { bg: C.dangerTint,  border: `color-mix(in srgb, ${C.danger} 27%, transparent)`, text: C.danger },
+    success: { bg: C.successTint, border: `color-mix(in srgb, ${C.success} 27%, transparent)`, text: C.success },
+    warning: { bg: C.warningTint, border: `color-mix(in srgb, ${C.warning} 27%, transparent)`, text: C.warning },
+    info:    { bg: C.infoTint,    border: `color-mix(in srgb, ${C.info} 27%, transparent)`, text: C.info },
   };
   const s = colors[type] || colors.info;
   return (

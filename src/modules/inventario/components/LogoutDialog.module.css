@@ -11,10 +11,10 @@
   color: #1f2937;
   font-family: Inter, system-ui, sans-serif;
   text-align: center;
-  box-shadow: 0 16px 48px rgb(15 23 42 / 18%);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 18%);
   animation: enter 180ms ease-out both;
 }
-.dialog::backdrop { background: rgb(15 23 42 / 38%); animation: fadeIn 180ms ease-out both; }
+.dialog::backdrop { background: rgb(0 0 0 / 38%); animation: fadeIn 180ms ease-out both; }
 .icon { display: grid; place-items: center; width: 52px; height: 52px; margin: 0 auto 18px; border-radius: 50%; background: #fdeaec; color: #e71950; }
 .title { margin: 0; font-size: 20px; line-height: 1.45; font-weight: 700; }
 .actions { display: flex; justify-content: center; gap: 12px; margin-top: 26px; }

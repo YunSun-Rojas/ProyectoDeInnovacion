@@ -12,6 +12,18 @@ export default function InventarioLayout() {
   const [products, setProducts] = useState(productosDashboard);
   const categories = categoriasDashboard;
   const [movements, setMovements] = useState([]);
+  const [darkMode, setDarkMode] = useState(() => {
+    try { return localStorage.getItem('eagle-dark-mode') === 'true'; }
+    catch { return false; }
+  });
+  const [themeError, setThemeError] = useState('');
+  const toggleDarkMode = () => {
+    const next = !darkMode;
+    setDarkMode(next);
+    setThemeError('');
+    try { localStorage.setItem('eagle-dark-mode', String(next)); }
+    catch { setThemeError('El tema se aplicó, pero no pudo guardarse en este navegador.'); }
+  };
   const [settings, setSettings] = useState(() => {
     const defaults = { company: 'Eagle Gaming', ruc: '20607787728', address: 'C.C. Garcilazo de la Vega 1348, Tda. 1B, 133', phone: '986638034', minStock: 5 };
     try {
@@ -52,14 +64,14 @@ export default function InventarioLayout() {
   };
 
   return (
-    <div className="inventory-shell" style={{ display: "flex", width: "100%", height: "100dvh", overflow: "hidden" }}>
+    <div className="inventory-shell" data-theme={darkMode ? 'dark' : 'light'} style={{ display: "flex", width: "100%", height: "100dvh", overflow: "hidden" }}>
       <Sidebar activePage={activePage} setActivePage={setActivePage} />
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, background: "#F1F5F9" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, background: "var(--inventory-bg, #F1F5F9)" }}>
         <Header products={products} />
 
         <main className="inventory-main" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-          <Outlet context={{ products, categories, movements, settings, setSettings, defaultMinStock: settings.minStock, onNavigate: setActivePage,
+          <Outlet context={{ products, categories, movements, settings, setSettings, darkMode, toggleDarkMode, themeError, defaultMinStock: settings.minStock, onNavigate: setActivePage,
             onAdd: handleAddProduct, onEdit: handleEditProduct,
             onDelete: handleDeleteProduct, onAdjustStock: handleAdjustStock }} />
         </main>

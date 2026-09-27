@@ -12,21 +12,21 @@ import {
 } from "lucide-react";
 
 const C = {
-  surface:    "#FFFFFF",
-  bg:         "#F1F5F9",
-  ink:        "#1F2937",
-  inkSecond:  "#475569",
-  muted:      "#64748B",
-  border:     "#E5E7EB",
-  borderFaint:"#E5E7EB",
+  surface:    "var(--inventory-surface, #FFFFFF)",
+  bg:         "var(--inventory-bg, #F1F5F9)",
+  ink:        "var(--inventory-ink, #1F2937)",
+  inkSecond:  "var(--inventory-ink-second, #475569)",
+  muted:      "var(--inventory-muted, #64748B)",
+  border:     "var(--inventory-border, #E5E7EB)",
+  borderFaint:"var(--inventory-border, #E5E7EB)",
   accent:     "#E32636",
-  accentTint: "#FBE6E8",
-  success:    "#1E8A4C",
-  successTint:"#E3F5EB",
-  warning:    "#C07D0A",
-  warningTint:"#FEF0D3",
-  danger:     "#991B2A",
-  dangerTint: "#FDEAEC",
+  accentTint: "var(--inventory-accent-tint, #FBE6E8)",
+  success:    "var(--inventory-success, #1E8A4C)",
+  successTint:"var(--inventory-success-tint, #E3F5EB)",
+  warning:    "var(--inventory-warning, #C07D0A)",
+  warningTint:"var(--inventory-warning-tint, #FEF0D3)",
+  danger:     "var(--inventory-danger, #991B2A)",
+  dangerTint: "var(--inventory-danger-tint, #FDEAEC)",
 };
 
 const FONT = { body: "Inter, system-ui, sans-serif" };
@@ -193,7 +193,7 @@ export default function Header({ products = [] }) {
           style={{
             display: "flex", alignItems: "center", gap: 6,
             background: justExported ? C.successTint : C.bg,
-            border: `1px solid ${justExported ? C.success + "55" : C.border}`,
+            border: `1px solid ${justExported ? `color-mix(in srgb, ${C.success} 33%, transparent)` : C.border}`,
             padding: "5px 12px", borderRadius: 7,
             fontFamily: FONT.body, fontSize: 12, fontWeight: 600,
             color: justExported ? C.success : C.inkSecond,
@@ -393,7 +393,7 @@ function NotifRow({ product, level }) {
       </div>
       <span style={{
         fontSize: 10, fontWeight: 700, color, background: bg,
-        border: `1px solid ${color}40`, borderRadius: 6, padding: "2px 6px",
+        border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`, borderRadius: 6, padding: "2px 6px",
         flexShrink: 0, alignSelf: "center",
       }}>
         {isCritical ? "AGOTADO" : "BAJO"}
