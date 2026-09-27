@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   DollarSign,
   Package,
@@ -15,10 +16,8 @@ import {
   RefreshCw,
   Clock,
   ChevronRight,
-  Info,
 } from "lucide-react";
 import {
-  AreaChart,
   Area,
   XAxis,
   YAxis,
@@ -30,16 +29,13 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
   Legend,
   ComposedChart,
-  ReferenceLine,
 } from "recharts";
 import { productosDashboard, categoriasDashboard } from '../data/inventarioReal';
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
-  bg:         "#F5F3EF",
+  bg:         "#F1F5F9",
   surface:    "#FFFFFF",
   surfaceAlt: "#FAFAF8",
   ink:        "#12121A",
@@ -48,7 +44,6 @@ const C = {
   border:     "#E5E1D8",
   borderFaint:"#EFECE6",
   accent:     "#D62839",
-  accentDark: "#A81E2B",
   accentTint: "#FBE6E8",
   accentGlow: "rgba(214,40,57,0.12)",
   success:    "#1E8A4C",
@@ -59,13 +54,6 @@ const C = {
   dangerTint: "#FDEAEC",
   info:       "#1A6FAB",
   infoTint:   "#E0F0FA",
-  // Chart palette
-  chart1:     "#D62839",
-  chart2:     "#1E8A4C",
-  chart3:     "#C07D0A",
-  chart4:     "#1A6FAB",
-  chart5:     "#7C3AED",
-  chart6:     "#0D9488",
 };
 
 const FONT = { heading: "Oswald, sans-serif", body: "Inter, system-ui, sans-serif" };
@@ -131,8 +119,20 @@ const CustomTooltip = ({ active, payload, label, prefix = "" }) => {
 };
 
 // ─── DASHBOARD ─────────────────────────────────────────────────────────────────
-export default function Dashboard({ products = productosDashboard, categories = categoriasDashboard, onNavigate }) {
+export default function Dashboard({ products = productosDashboard, categories = categoriasDashboard, movements = [], onNavigate }) {
   const [activeChart, setActiveChart] = useState("valorInventario");
+
+  const cardNavigation = (page) => ({
+    role: "link",
+    tabIndex: 0,
+    onClick: event => { if (!event.target.closest('a, button, input, select')) onNavigate(page); },
+    onKeyDown: event => {
+      if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+        event.preventDefault();
+        onNavigate(page);
+      }
+    },
+  });
 
   // ── Métricas derivadas ────────────────────────────────────────────────────────
   const metrics = useMemo(() => {
@@ -141,7 +141,7 @@ export default function Dashboard({ products = productosDashboard, categories = 
     const totalSoldMonth  = products.reduce((s, p) => s + p.unitsSoldThisMonth, 0);
     const totalSoldLast   = products.reduce((s, p) => s + p.unitsSoldLastMonth, 0);
     const revenueMonth    = products.reduce((s, p) => s + p.unitsSoldThisMonth * p.price, 0);
-    const revenueLast     = products.reduce((s, p) => s + p.unitsSoldLastMonth, 0);
+    const revenueLast     = products.reduce((s, p) => s + p.unitsSoldLastMonth * p.price, 0);
     const lowStockItems   = products.filter(p => p.stock <= p.minStock);
     const criticalItems   = products.filter(p => p.stock === 0);
     const turnoverRate    = totalValue > 0 ? ((revenueMonth / totalValue) * 100).toFixed(1) : 0;
@@ -151,19 +151,16 @@ export default function Dashboard({ products = productosDashboard, categories = 
     const categoryMetrics = categories.map(cat => {
       const catProducts = products.filter(p => p.category === cat.name);
       const catStock    = catProducts.reduce((s, p) => s + p.stock, 0);
-      const catValue    = catProducts.reduce((s, p) => s + p.stock * p.price, 0);
       const catSold     = catProducts.reduce((s, p) => s + p.unitsSoldThisMonth, 0);
-      const catRevenue  = catProducts.reduce((s, p) => s + p.unitsSoldThisMonth * p.price, 0);
       return {
         name:     cat.name,
         productos: catProducts.length,
         stock:    catStock,
-        valor:    catValue,
         vendidos: catSold,
-        ingresos: catRevenue,
         rotacion: catStock > 0 ? ((catSold / catStock) * 100).toFixed(1) : 0,
       };
-    }).filter(c => c.productos > 0);
+    }).filter(c => c.productos > 0)
+      .sort((a, b) => parseFloat(b.rotacion) - parseFloat(a.rotacion));
 
     // Estado de salud del inventario
     const stockHealth = [
@@ -173,17 +170,11 @@ export default function Dashboard({ products = productosDashboard, categories = 
       { name: "Agotado",   value: products.filter(p => p.stock === 0).length,                                   color: C.danger },
     ].filter(s => s.value > 0);
 
-    // Top 5 productos por valor en inventario
-    const topByValue = [...products]
-      .sort((a, b) => (b.stock * b.price) - (a.stock * a.price))
-      .slice(0, 5)
-      .map(p => ({ name: p.name.length > 22 ? p.name.slice(0, 22) + "…" : p.name, valor: p.stock * p.price, vendidos: p.unitsSoldThisMonth }));
-
     // Top 5 más vendidos este mes
-    const topBySales = [...products]
+    const topBySales = [...products].filter(p => p.unitsSoldThisMonth > 0)
       .sort((a, b) => b.unitsSoldThisMonth - a.unitsSoldThisMonth)
       .slice(0, 5)
-      .map(p => ({ name: p.name.length > 22 ? p.name.slice(0, 22) + "…" : p.name, unidades: p.unitsSoldThisMonth, ingresos: p.unitsSoldThisMonth * p.price }));
+      .map(p => ({ sku: p.sku, name: p.name.length > 22 ? p.name.slice(0, 22) + "…" : p.name, unidades: p.unitsSoldThisMonth, ingresos: p.unitsSoldThisMonth * p.price }));
 
     // Productos que necesitan reorden, ordenados por urgencia
     const reorderList = products
@@ -205,10 +196,10 @@ export default function Dashboard({ products = productosDashboard, categories = 
       insights.push({ icon: "⚡", text: `"${fastMover.name}" es el producto más vendido este mes con ${fastMover.unidades} unidades.`, type: "info" });
 
     return {
-      totalStock, totalValue, totalSoldMonth, totalSoldLast,
-      revenueMonth, revenueLast, lowStockItems, criticalItems,
+      totalStock, totalValue, totalSoldMonth,
+      revenueMonth, lowStockItems, criticalItems,
       turnoverRate, avgPrice, categoryMetrics, stockHealth,
-      topByValue, topBySales, reorderList, insights,
+      topBySales, reorderList, insights,
       pctRevenue: pct(revenueMonth, revenueLast),
       pctSold:    pct(totalSoldMonth, totalSoldLast),
     };
@@ -218,13 +209,13 @@ export default function Dashboard({ products = productosDashboard, categories = 
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ padding: "28px 36px 48px", background: C.bg, minHeight: "100vh", boxSizing: "border-box" }}>
+    <div className="dashboard-page" style={{ padding: "28px 36px 48px", background: C.bg, minHeight: "100vh", boxSizing: "border-box" }}>
 
       {/* ── Encabezado ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28 }}>
+      <div className="dashboard-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-            <div style={{ width: 4, height: 28, borderRadius: 2, background: C.accent }} />
+            <div style={{ width: 4, height: 28, borderRadius: 2, background: "#E32636" }} />
             <h1 style={{ margin: 0, fontFamily: FONT.heading, fontSize: 30, fontWeight: 700, color: C.ink, letterSpacing: "0.5px" }}>
               Panel de Control
             </h1>
@@ -240,16 +231,18 @@ export default function Dashboard({ products = productosDashboard, categories = 
       </div>
 
       {/* ── KPIs Row 1 (4 cards) ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 16 }}>
+      <div className="dashboard-kpis" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16, marginBottom: 16 }}>
         <KpiCard
+          to="/dashboard/productos"
           title="Valor Total Inventario"
           value={currency(metrics.totalValue)}
           sub={`${products.length} SKUs activos`}
-          trend={"+12.5% vs mes anterior"}
+          trend={"Valor del stock actual"}
           isPositive icon={DollarSign}
-          accent={C.accent}
+          accent="#E32636"
         />
         <KpiCard
+          to="/dashboard/productos?estado=disponible"
           title="Unidades en Stock"
           value={metrics.totalStock.toLocaleString("es-PE")}
           sub={`Promedio S/. ${metrics.avgPrice} por ítem`}
@@ -257,6 +250,7 @@ export default function Dashboard({ products = productosDashboard, categories = 
           isPositive icon={Package}
         />
         <KpiCard
+          to="/dashboard/productos?estado=vendidos"
           title="Ingresos por Ventas"
           value={currency(metrics.revenueMonth)}
           sub={`${metrics.totalSoldMonth} unidades vendidas`}
@@ -266,6 +260,7 @@ export default function Dashboard({ products = productosDashboard, categories = 
           accent={metrics.pctRevenue >= 0 ? C.ink : C.danger}
         />
         <KpiCard
+          to="/dashboard/productos?estado=alertas"
           title="Alertas Activas"
           value={metrics.lowStockItems.length}
           sub={`${metrics.criticalItems.length} productos agotados`}
@@ -278,8 +273,9 @@ export default function Dashboard({ products = productosDashboard, categories = 
       </div>
 
       {/* ── KPIs Row 2 (2 secundarios) ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 440px), 1fr))", gap: 16, marginBottom: 24 }}>
         <MiniStatCard
+          to="/dashboard/productos"
           title="Tasa de Rotación de Inventario"
           value={`${metrics.turnoverRate}%`}
           desc="Ingresos / Valor inventario (mensual)"
@@ -288,12 +284,13 @@ export default function Dashboard({ products = productosDashboard, categories = 
           hint={parseFloat(metrics.turnoverRate) >= 15 ? "Rotación saludable" : "Por debajo del umbral óptimo (15%)"}
         />
         <MiniStatCard
+          to="/dashboard/productos"
           title="Categorías Gestionadas"
           value={categories.length}
           desc={`${categories.length} familias de productos activas`}
           icon={Layers}
           color={C.info}
-          hint={`Top: ${metrics.categoryMetrics[0]?.name ?? "—"} con ${metrics.categoryMetrics[0]?.vendidos ?? 0} unid. vendidas`}
+          hint={`${metrics.categoryMetrics.length} categorías con productos`}
         />
       </div>
 
@@ -307,12 +304,12 @@ export default function Dashboard({ products = productosDashboard, categories = 
       )}
 
       {/* ── Fila de 4 gráficos del mismo peso ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 20, marginBottom: 20 }}>
 
         {/* Gráfico: Evolución mensual (área interactiva) */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
+        <div {...cardNavigation("historial")} style={{ cursor: "pointer", minWidth: 0, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-            <ChartHeader icon={TrendingUp} title="Evolución Mensual" sub="Últimos 7 meses" />
+            <ChartHeader icon={TrendingUp} title="Evolución Mensual" sub="Simulación de 7 meses" to="/dashboard/historial" />
             <div style={{ display: "flex", gap: 4 }}>
               {[
                 { key: "valorInventario", label: "S/.", color: C.accent },
@@ -372,8 +369,8 @@ export default function Dashboard({ products = productosDashboard, categories = 
         </div>
 
         {/* Gráfico: Stock + Ventas por Categoría (Barras agrupadas) */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
-          <ChartHeader icon={BarChart3} title="Stock vs. Ventas por Categoría" sub="Comparativa mensual por familia de productos" />
+        <div {...cardNavigation("productos")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
+          <ChartHeader icon={BarChart3} title="Stock vs. Ventas por Categoría" sub="Comparativa mensual por familia de productos" to="/dashboard/productos" />
           <div style={{ height: 200 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={metrics.categoryMetrics} margin={{ top: 8, right: 8, left: -22, bottom: 0 }} barGap={2}>
@@ -391,8 +388,8 @@ export default function Dashboard({ products = productosDashboard, categories = 
         </div>
 
         {/* Gráfico: Donut estado del inventario */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
-          <ChartHeader icon={PieIcon} title="Estado de Salud" sub="Distribución de disponibilidad" />
+        <div {...cardNavigation("productos?estado=alertas")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
+          <ChartHeader icon={PieIcon} title="Estado de Salud" sub="Distribución de disponibilidad" to="/dashboard/productos?estado=alertas" />
           <div style={{ height: 140, marginTop: 4 }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -425,12 +422,10 @@ export default function Dashboard({ products = productosDashboard, categories = 
         </div>
 
         {/* Gráfico: Rotación por Categoría (Barras horizontales) */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px", display: "flex", flexDirection: "column" }}>
-          <ChartHeader icon={Activity} title="Tasa de Rotación" sub="Ventas / Stock disponible (%)" />
+        <div {...cardNavigation("productos")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px", display: "flex", flexDirection: "column" }}>
+          <ChartHeader icon={Activity} title="Tasa de Rotación" sub="Ventas / Stock disponible (%)" to="/dashboard/productos" />
           <div style={{ marginTop: 12, flex: 1, maxHeight: 200, overflowY: "auto", paddingRight: 6, display: "flex", flexDirection: "column", gap: 8 }}>
-            {metrics.categoryMetrics
-              .sort((a, b) => parseFloat(b.rotacion) - parseFloat(a.rotacion))
-              .map(cat => (
+            {metrics.categoryMetrics.map(cat => (
                 <RotationBar
                   key={cat.name}
                   name={cat.name}
@@ -444,20 +439,21 @@ export default function Dashboard({ products = productosDashboard, categories = 
       </div>
 
       {/* ── Fila inferior: Top productos + Tabla de reorden ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 20 }}>
+      <div className="dashboard-bottom" style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 20 }}>
 
         {/* Top 5 Más Vendidos */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
-          <ChartHeader icon={Zap} title="Top Productos · Ventas" sub="Unidades vendidas este mes" />
+        <div {...cardNavigation("productos?estado=vendidos")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
+          <ChartHeader icon={Zap} title="Top Productos · Ventas" sub="Unidades vendidas este mes" to="/dashboard/productos?estado=vendidos" />
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
+            {metrics.topBySales.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>Aún no hay ventas registradas este mes.</p>}
             {metrics.topBySales.map((p, i) => (
-              <TopProductRow key={i} rank={i + 1} name={p.name} value={p.unidades} suffix="uds." secondValue={currency(p.ingresos)} />
+              <TopProductRow to={`/dashboard/productos?q=${encodeURIComponent(p.sku)}`} key={i} rank={i + 1} name={p.name} value={p.unidades} suffix="uds." secondValue={currency(p.ingresos)} />
             ))}
           </div>
         </div>
 
         {/* Tabla de Reorden Prioritaria */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
+        <div {...cardNavigation("productos?estado=alertas")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <div>
               <h3 style={{ margin: 0, fontFamily: FONT.body, fontSize: 14, fontWeight: 700, color: C.ink, display: "flex", alignItems: "center", gap: 6 }}>
@@ -467,7 +463,7 @@ export default function Dashboard({ products = productosDashboard, categories = 
               <p style={{ margin: "2px 0 0", fontSize: 12, color: C.muted }}>Ordenados por urgencia de reposición</p>
             </div>
             <button
-              onClick={() => onNavigate("productos")}
+              onClick={() => onNavigate("productos?estado=alertas")}
               style={{
                 display: "flex", alignItems: "center", gap: 4,
                 border: `1px solid ${C.border}`, background: C.surfaceAlt,
@@ -487,7 +483,7 @@ export default function Dashboard({ products = productosDashboard, categories = 
               <p style={{ color: C.success, fontSize: 13, fontWeight: 600, margin: 0 }}>Todo el inventario está en niveles óptimos</p>
             </div>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: FONT.body }}>
+            <div style={{ overflowX: "auto" }}><table style={{ width: "100%", minWidth: 420, borderCollapse: "collapse", fontFamily: FONT.body }}>
               <thead>
                 <tr style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.4px" }}>
                   <th style={{ textAlign: "left", paddingBottom: 8, fontWeight: 600 }}>Producto</th>
@@ -503,7 +499,7 @@ export default function Dashboard({ products = productosDashboard, categories = 
                     <tr key={p.id} style={{ borderTop: `1px solid ${C.borderFaint}`, fontSize: 12 }}>
                       <td style={{ padding: "9px 0" }}>
                         <div style={{ fontWeight: 600, color: C.ink, lineHeight: 1.2 }}>
-                          {p.name.length > 28 ? p.name.slice(0, 28) + "…" : p.name}
+                          <Link to={`/dashboard/productos?q=${encodeURIComponent(p.sku)}`} style={{ color: "inherit" }}>{p.name.length > 28 ? p.name.slice(0, 28) + "…" : p.name}</Link>
                         </div>
                         <div style={{ color: C.muted, fontSize: 11 }}>{p.sku}</div>
                       </td>
@@ -515,7 +511,7 @@ export default function Dashboard({ products = productosDashboard, categories = 
                         {p.stock === 0
                           ? <span style={{ color: C.danger, fontWeight: 700, fontSize: 12 }}>—</span>
                           : <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3, color: u.color, fontWeight: 700 }}>
-                              <Clock size={11} />{u.days}d
+                              <Clock size={11} />{Number.isFinite(u.days) ? `${u.days}d` : "Sin datos de ventas"}
                             </span>
                         }
                       </td>
@@ -531,10 +527,25 @@ export default function Dashboard({ products = productosDashboard, categories = 
                   );
                 })}
               </tbody>
-            </table>
+            </table></div>
           )}
         </div>
 
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 20, marginTop: 20 }}>
+        <section {...cardNavigation("historial")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
+          <ChartHeader icon={Clock} title="Últimos movimientos" sub={`${movements.length} movimientos registrados en esta sesión`} to="/dashboard/historial" />
+          {movements.length === 0 ? <p style={{ color: C.muted, fontSize: 12 }}>Todavía no hay movimientos. Los cambios de Inventario aparecerán aquí.</p> : movements.slice(0, 3).map(m => <p key={m.id} style={{ fontSize: 12, color: C.inkSecond }}><strong>{m.type}</strong> · {m.product} · {m.before} → {m.after}</p>)}
+        </section>
+        <section {...cardNavigation("prediccion")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
+          <ChartHeader icon={TrendingUp} title="Predicción IA" sub="Simulación disponible" to="/dashboard/prediccion" />
+          <p style={{ color: C.muted, fontSize: 12 }}>Consulta la demostración de estimaciones para los productos del inventario.</p>
+        </section>
+        <section {...cardNavigation("vision")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
+          <ChartHeader icon={Package} title="Reconocimiento Visión" sub="Simulación disponible" to="/dashboard/vision" />
+          <p style={{ color: C.muted, fontSize: 12 }}>Abre la demostración de reconocimiento. Todavía no registra ingresos al stock.</p>
+        </section>
       </div>
 
     </div>
@@ -543,9 +554,9 @@ export default function Dashboard({ products = productosDashboard, categories = 
 
 // ─── Sub-componentes ───────────────────────────────────────────────────────────
 
-function KpiCard({ title, value, sub, trend, isPositive, icon: Icon, accent, urgent }) {
+function KpiCard({ to, title, value, sub, trend, isPositive, icon: Icon, accent, urgent }) {
   return (
-    <div style={{
+    <Link to={to} style={{ minWidth: 0, textDecoration: "none", color: "inherit",
       background: C.surface,
       border: `1px solid ${urgent ? C.accent + "55" : C.border}`,
       borderRadius: 14,
@@ -570,7 +581,7 @@ function KpiCard({ title, value, sub, trend, isPositive, icon: Icon, accent, urg
       </div>
 
       <div>
-        <div style={{ fontFamily: FONT.heading, fontSize: 28, fontWeight: 700, color: accent || C.ink, lineHeight: 1.1 }}>
+        <div style={{ fontFamily: FONT.heading, fontSize: "clamp(22px, 2vw, 28px)", overflowWrap: "anywhere", fontWeight: 700, color: accent || C.ink, lineHeight: 1.1 }}>
           {value}
         </div>
         <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{sub}</div>
@@ -582,13 +593,13 @@ function KpiCard({ title, value, sub, trend, isPositive, icon: Icon, accent, urg
           : <ArrowDownRight size={13} color={C.danger} />}
         <span style={{ color: isPositive ? C.success : C.danger }}>{trend}</span>
       </div>
-    </div>
+    </Link>
   );
 }
 
-function MiniStatCard({ title, value, desc, icon: Icon, color, hint }) {
+function MiniStatCard({ to, title, value, desc, icon: Icon, color, hint }) {
   return (
-    <div style={{
+    <Link className="dashboard-mini" to={to} style={{ minWidth: 0, textDecoration: "none", color: "inherit",
       background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14,
       padding: "16px 20px", display: "flex", alignItems: "center", gap: 16,
     }}>
@@ -603,7 +614,7 @@ function MiniStatCard({ title, value, desc, icon: Icon, color, hint }) {
       <div style={{ background: color + "14", border: `1px solid ${color}30`, borderRadius: 8, padding: "6px 10px", fontSize: 11, color, fontWeight: 600, maxWidth: 160, textAlign: "center" }}>
         {hint}
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -628,12 +639,12 @@ function InsightPill({ icon, text, type }) {
   );
 }
 
-function ChartHeader({ icon: Icon, title, sub }) {
+function ChartHeader({ icon: Icon, title, sub, to }) {
   return (
     <div style={{ marginBottom: 4 }}>
       <h3 style={{ margin: 0, fontFamily: FONT.body, fontSize: 14, fontWeight: 700, color: C.ink, display: "flex", alignItems: "center", gap: 6 }}>
         <Icon size={14} color={C.accent} />
-        {title}
+        {to ? <Link to={to} style={{ color: "inherit", textDecoration: "none" }} title="Abrir detalle">{title} <ChevronRight size={12} style={{ display: "inline" }} /></Link> : title}
       </h3>
       {sub && <p style={{ margin: "2px 0 0", fontSize: 11, color: C.muted }}>{sub}</p>}
     </div>
@@ -647,7 +658,7 @@ function RotationBar({ name, value, max }) {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-        <span style={{ fontFamily: FONT.body, fontSize: 12, color: C.inkSecond, fontWeight: 500 }}>{shortName}</span>
+        <Link to={`/dashboard/productos?categoria=${encodeURIComponent(name)}`} style={{ fontFamily: FONT.body, fontSize: 12, color: C.inkSecond, fontWeight: 500, textDecoration: "none" }}>{shortName}</Link>
         <span style={{ fontFamily: FONT.body, fontSize: 12, fontWeight: 700, color }}>{value}%</span>
       </div>
       <div style={{ height: 5, background: C.borderFaint, borderRadius: 3, overflow: "hidden" }}>
@@ -660,10 +671,10 @@ function RotationBar({ name, value, max }) {
   );
 }
 
-function TopProductRow({ rank, name, value, suffix, secondValue }) {
+function TopProductRow({ to, rank, name, value, suffix, secondValue }) {
   const rankColors = ["#D62839", "#C07D0A", "#1A6FAB", "#454550", "#454550"];
   return (
-    <div style={{
+    <Link to={to} style={{ minWidth: 0, textDecoration: "none", color: "inherit",
       display: "flex", alignItems: "center", gap: 10,
       padding: "8px 10px", borderRadius: 8,
       background: rank === 1 ? C.accentTint : C.surfaceAlt,
@@ -682,6 +693,6 @@ function TopProductRow({ rank, name, value, suffix, secondValue }) {
         <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{value} <span style={{ fontSize: 10, color: C.muted, fontWeight: 400 }}>{suffix}</span></div>
         <div style={{ fontSize: 10, color: C.muted }}>{secondValue}</div>
       </div>
-    </div>
+    </Link>
   );
 }

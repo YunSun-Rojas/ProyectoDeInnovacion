@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useAuthSession } from '../../auth/services/useAuthSession';
 import {
   Calendar,
   Download,
@@ -7,19 +8,18 @@ import {
   AlertTriangle,
   XCircle,
   ChevronDown,
-  Search,
   RefreshCw,
 } from "lucide-react";
 
 const C = {
   surface:    "#FFFFFF",
-  bg:         "#FAF8F5",
-  ink:        "#12121A",
-  inkSecond:  "#454550",
-  muted:      "#8A8880",
-  border:     "#E5E1D8",
-  borderFaint:"#EFECE6",
-  accent:     "#D62839",
+  bg:         "#F1F5F9",
+  ink:        "#1F2937",
+  inkSecond:  "#475569",
+  muted:      "#64748B",
+  border:     "#E5E7EB",
+  borderFaint:"#E5E7EB",
+  accent:     "#E32636",
   accentTint: "#FBE6E8",
   success:    "#1E8A4C",
   successTint:"#E3F5EB",
@@ -47,12 +47,15 @@ function useClickOutside(ref, handler) {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function Header({ products = [] }) {
+  const { session } = useAuthSession();
+  const profileName = session?.user?.user_metadata?.full_name;
+  const displayName = (typeof profileName === 'string' && profileName.trim()) || session?.user?.email || 'Mi cuenta';
+  const initials = displayName.split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showDatePicker,    setShowDatePicker]    = useState(false);
   const [selectedRange,     setSelectedRange]     = useState("Últimos 30 días");
   const [exporting,         setExporting]         = useState(false);
   const [justExported,      setJustExported]      = useState(false);
-  const [searchQuery,       setSearchQuery]       = useState("");
 
   const notifRef   = useRef(null);
   const dateRef    = useRef(null);
@@ -116,7 +119,7 @@ export default function Header({ products = [] }) {
   };
 
   return (
-    <header style={{
+    <header className="inventory-header" style={{
       display:        "flex",
       justifyContent: "space-between",
       alignItems:     "center",
@@ -131,10 +134,10 @@ export default function Header({ products = [] }) {
     }}>
 
       {/* ── Lado izquierdo: KPIs rápidos + rango de fecha ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+      <div className="header-tools" style={{ display: "flex", alignItems: "center", gap: 20 }}>
 
         {/* Resumen numérico compacto */}
-        <div style={{ display: "flex", gap: 20, borderRight: `1px solid ${C.borderFaint}`, paddingRight: 20 }}>
+        <div className="header-stats" style={{ display: "flex", gap: 20, borderRight: `1px solid ${C.borderFaint}`, paddingRight: 20 }}>
           <QuickStat label="Valor inv." value={currency(totalValue)} />
           <QuickStat label="Vendidos / mes" value={`${totalSold} uds.`} />
         </div>
@@ -208,7 +211,7 @@ export default function Header({ products = [] }) {
       </div>
 
       {/* ── Lado derecho: notificaciones + usuario ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <div className="header-user" style={{ display: "flex", alignItems: "center", gap: 14 }}>
 
         {/* Campana de notificaciones */}
         <div ref={notifRef} style={{ position: "relative" }}>
@@ -240,7 +243,7 @@ export default function Header({ products = [] }) {
           {showNotifications && (
             <div style={{
               position: "absolute", right: 0, top: 42,
-              width: 340, background: C.surface,
+              width: "min(340px, calc(100vw - 32px))", background: C.surface,
               border: `1px solid ${C.border}`, borderRadius: 12,
               boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
               overflow: "hidden", zIndex: 200,
@@ -321,16 +324,16 @@ export default function Header({ products = [] }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "default" }}>
           <div style={{
             width: 32, height: 32, borderRadius: "50%",
-            background: "linear-gradient(135deg, #D62839, #8F1B26)",
+            background: "linear-gradient(135deg, #E32636, #E32636)",
             color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: FONT.body, fontWeight: 700, fontSize: 12, letterSpacing: "0.5px",
-            boxShadow: "0 2px 6px rgba(214,40,57,0.35)",
+            boxShadow: "0 2px 6px rgba(59,130,246,0.35)",
           }}>
-            AD
+            {initials}
           </div>
           <div>
-            <div style={{ fontFamily: FONT.body, fontSize: 12, fontWeight: 700, color: C.ink, lineHeight: 1.2 }}>
-              Admin Sistema
+            <div title={displayName} style={{ fontFamily: FONT.body, fontSize: 12, fontWeight: 700, color: C.ink, lineHeight: 1.2, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {displayName}
             </div>
             <div style={{ fontFamily: FONT.body, fontSize: 10, color: C.muted }}>
               Proyecto de Tesis · 2026

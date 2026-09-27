@@ -1,14 +1,14 @@
-import React, { useState, useMemo } from "react";
-import { Search, Plus, Pencil, Trash2, ArrowUp, ArrowDown, PackageSearch, X } from "lucide-react";
+import { useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Search, Plus, Pencil, Trash2, X } from "lucide-react";
 
 const COLORS = {
-  bg: "#FAF8F5",
+  bg: "#F1F5F9",
   cardBg: "#FFFFFF",
-  ink: "#17171A",
-  muted: "#6E6C68",
-  border: "#E7E3DC",
-  accent: "#D62839",
-  accentHover: "#8F1B26",
+  ink: "#1F2937",
+  muted: "#64748B",
+  border: "#E5E7EB",
+  accent: "#E32636",
   accentTint: "#FBE6E7",
   success: "#2F7D4F",
   successTint: "#E4F2E9",
@@ -19,8 +19,17 @@ const COLORS = {
 };
 
 export default function Productos({ products, categories, onAdd, onEdit, onDelete, onAdjustStock, defaultMinStock = 5 }) {
-  const [query, setQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("Todas");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const query = searchParams.get('q') || '';
+  const categoryFilter = searchParams.get('categoria') || 'Todas';
+  const statusFilter = searchParams.get('estado') || '';
+  const setFilter = (key, value) => setSearchParams(previous => {
+    const next = new URLSearchParams(previous);
+    if (value) next.set(key, value); else next.delete(key);
+    return next;
+  }, { replace: true });
+  const setQuery = value => setFilter('q', value);
+  const setCategoryFilter = value => setFilter('categoria', value === 'Todas' ? '' : value);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
@@ -28,14 +37,17 @@ export default function Productos({ products, categories, onAdd, onEdit, onDelet
     return products.filter((p) => {
       const matchesQuery = p.name.toLowerCase().includes(query.toLowerCase()) || p.sku.toLowerCase().includes(query.toLowerCase());
       const matchesCategory = categoryFilter === "Todas" || p.category === categoryFilter;
-      return matchesQuery && matchesCategory;
+      const matchesStatus = statusFilter === 'alertas' ? p.stock <= p.minStock
+        : statusFilter === 'disponible' ? p.stock > 0
+        : statusFilter === 'vendidos' ? p.unitsSoldThisMonth > 0 : true;
+      return matchesQuery && matchesCategory && matchesStatus;
     });
-  }, [products, query, categoryFilter]);
+  }, [products, query, categoryFilter, statusFilter]);
 
   return (
     <div style={{ padding: "32px 40px", background: COLORS.bg, minHeight: "100vh" }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, flexWrap: "wrap", gap: 16 }}>
         <div>
           <h1 style={{ margin: 0, fontFamily: "Oswald, sans-serif", fontSize: 32, fontWeight: 700, color: COLORS.ink }}>
             Inventario de Productos
@@ -75,7 +87,7 @@ export default function Productos({ products, categories, onAdd, onEdit, onDelet
           border: `1px solid ${COLORS.border}`,
           borderRadius: 8,
           padding: "8px 14px",
-          minWidth: 280
+          minWidth: "min(280px, 100%)"
         }}>
           <Search size={18} color={COLORS.muted} />
           <input
@@ -110,8 +122,12 @@ export default function Productos({ products, categories, onAdd, onEdit, onDelet
       </div>
 
       {/* Tabla de Productos */}
-      <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Inter, sans-serif" }}>
+      {(query || categoryFilter !== 'Todas' || statusFilter) && <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, fontSize: 13, color: COLORS.muted }}>
+        <span>{filteredProducts.length} productos · {statusFilter === 'alertas' ? 'Stock bajo o agotado' : statusFilter === 'disponible' ? 'Con stock disponible' : statusFilter === 'vendidos' ? 'Con ventas este mes' : 'Inventario filtrado'}</span>
+        <button type="button" onClick={() => setSearchParams({})} style={{ border: `1px solid ${COLORS.border}`, borderRadius: 6, background: COLORS.cardBg, padding: '6px 10px', cursor: 'pointer', color: COLORS.ink }}>Limpiar filtros</button>
+      </div>}
+      <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflowX: "auto" }}>
+        <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse", fontFamily: "Inter, sans-serif" }}>
           <thead>
             <tr style={{ background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`, textAlign: "left", fontSize: 12, color: COLORS.muted }}>
               <th style={{ padding: "14px 20px" }}>PRODUCTO</th>
@@ -124,6 +140,7 @@ export default function Productos({ products, categories, onAdd, onEdit, onDelet
             </tr>
           </thead>
           <tbody>
+            {filteredProducts.length === 0 && <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: COLORS.muted }}>No hay productos que coincidan con los filtros.</td></tr>}
             {filteredProducts.map((p) => {
               const isOut = p.stock === 0;
               const isLow = p.stock <= p.minStock && !isOut;
@@ -199,34 +216,34 @@ function ProductModal({ initialData, categories, onClose, onSave, defaultMinStoc
         <div style={{ display: "flex", flexDirection: "column", gap: 14, fontFamily: "Inter, sans-serif", fontSize: 13 }}>
           <div>
             <label style={{ fontWeight: 600, display: "block", marginBottom: 4 }}>Nombre</label>
-            <input style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E7E3DC", boxSizing: "border-box" }} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E5E7EB", boxSizing: "border-box" }} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
           <div>
             <label style={{ fontWeight: 600, display: "block", marginBottom: 4 }}>SKU</label>
-            <input style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E7E3DC", boxSizing: "border-box" }} value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+            <input style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E5E7EB", boxSizing: "border-box" }} value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
           </div>
           <div>
             <label style={{ fontWeight: 600, display: "block", marginBottom: 4 }}>Categoría</label>
-            <select style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E7E3DC" }} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+            <select style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E5E7EB" }} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
               {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontWeight: 600, display: "block", marginBottom: 4 }}>Stock</label>
-              <input type="number" style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E7E3DC", boxSizing: "border-box" }} value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} />
+              <input type="number" style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E5E7EB", boxSizing: "border-box" }} value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} />
             </div>
             <div style={{ flex: 1 }}>
               <label style={{ fontWeight: 600, display: "block", marginBottom: 4 }}>Mínimo</label>
-              <input type="number" style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E7E3DC", boxSizing: "border-box" }} value={form.minStock} onChange={(e) => setForm({ ...form, minStock: Number(e.target.value) })} />
+              <input type="number" style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E5E7EB", boxSizing: "border-box" }} value={form.minStock} onChange={(e) => setForm({ ...form, minStock: Number(e.target.value) })} />
             </div>
           </div>
           <div>
             <label style={{ fontWeight: 600, display: "block", marginBottom: 4 }}>Precio (S/.)</label>
-            <input type="number" style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E7E3DC", boxSizing: "border-box" }} value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
+            <input type="number" style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E5E7EB", boxSizing: "border-box" }} value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
           </div>
 
-          <button onClick={() => onSave(form)} style={{ marginTop: 10, background: "#D62839", color: "#FFF", border: "none", padding: "12px", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>
+          <button onClick={() => onSave(form)} style={{ marginTop: 10, background: "#E32636", color: "#FFF", border: "none", padding: "12px", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>
             Guardar
           </button>
         </div>

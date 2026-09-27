@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { logoutDemo } from "../../auth/services/demoSession";
-import { TextGradient } from "../../../components/ui/TextGradient";
+import LogoutDialog from './LogoutDialog';
 import { 
   LayoutGrid, 
   Boxes, 
@@ -22,49 +23,55 @@ const NAV_ITEMS = [
 
 export default function Sidebar({ activePage, setActivePage }) {
   const navigate = useNavigate();
-  const handleLogout = () => {
-    logoutDemo();
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setLogoutError('');
+    const result = await logoutDemo();
+    if (!result.ok) {
+      setLogoutError(result.error);
+      setLoggingOut(false);
+      return;
+    }
     navigate('/login', { replace: true });
   };
   return (
-    <aside style={{
+    <>
+    <aside className="inventory-sidebar" style={{
       width: 240,
-      background: "#F3F4F6",
-      color: "#454550",
+      background: "#E71950",
+      color: "#F1F5F9",
       display: "flex",
       flexDirection: "column",
       justifyContent: "space-between",
       padding: "24px 16px",
       flexShrink: 0,
-      minHeight: "100vh"
+      minHeight: 0
     }}>
       <div>
         {/* Brand Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "0 8px 32px 8px" }}>
+        <div className="sidebar-brand" style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 0 32px" }}>
           <div style={{
-            width: 44,
-            height: 44,
+            width: 50,
+            height: 50,
             flexShrink: 0,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             color: "#FFF"
           }}>
-            <img src="/logo-Eagle.png" alt="Logo de Eagle Gaming" style={{ width: 44, height: 44, objectFit: "contain" }} />
+            <img src="/logo-Eagle.png" alt="Logo de Eagle Gaming" style={{ width: 50, height: 50, objectFit: "contain" }} />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontFamily: "Inter, system-ui, sans-serif", fontSize: 18, fontWeight: 800, lineHeight: 1.3, color: "#17171A", letterSpacing: "-0.4px" }}>
+            <h2 style={{ margin: 0, fontFamily: "Inter, system-ui, sans-serif", fontSize: 20, fontWeight: 800, lineHeight: 1.3, color: "#FFFFFF", letterSpacing: "-0.4px" }}>
               Eagle Gaming
             </h2>
-            <TextGradient
-              as="span"
-              colors={['#000000', '#cc0000', '#000000', '#cc0000']}
-              duration={4}
-              angle={135}
-              className="text-[11px] font-medium"
-            >
+            <span style={{ color: "#FFFFFF", fontSize: 11, fontWeight: 500 }}>
               Inventario Inteligente
-            </TextGradient>
+            </span>
           </div>
         </div>
 
@@ -76,6 +83,7 @@ export default function Sidebar({ activePage, setActivePage }) {
             return (
               <button
                 key={item.id}
+                aria-label={item.label}
                 onClick={() => setActivePage(item.id)}
                 style={{
                   display: "flex",
@@ -84,8 +92,8 @@ export default function Sidebar({ activePage, setActivePage }) {
                   padding: "11px 14px",
                   borderRadius: 8,
                   border: "none",
-                  background: isActive ? "#D62839" : "transparent",
-                  color: isActive ? "#FFFFFF" : "#454550",
+                  background: isActive ? "#F1F5F9" : "transparent",
+                  color: isActive ? "#E71950" : "#FFFFFF",
                   fontFamily: "Inter, sans-serif",
                   fontSize: 14,
                   fontWeight: isActive ? 600 : 500,
@@ -94,8 +102,8 @@ export default function Sidebar({ activePage, setActivePage }) {
                   textAlign: "left"
                 }}
               >
-                <Icon size={18} color={isActive ? "#FFFFFF" : "#454550"} />
-                {item.label}
+                <Icon size={18} color={isActive ? "#E71950" : "#FFFFFF"} />
+                <span className="sidebar-label">{item.label}</span>
               </button>
             );
           })}
@@ -103,9 +111,15 @@ export default function Sidebar({ activePage, setActivePage }) {
       </div>
 
       {/* Footer / Logout */}
-      <div style={{ borderTop: "1px solid #E5E7EB", paddingTop: 16 }}>
+      <div className="sidebar-footer" style={{ borderTop: "1px solid rgba(241,245,249,0.3)", paddingTop: 16 }}>
         <button
-          onClick={handleLogout}
+          type="button"
+          disabled={loggingOut}
+          aria-busy={loggingOut}
+          aria-haspopup="dialog"
+          aria-expanded={showLogoutDialog}
+          aria-controls={showLogoutDialog ? 'logout-dialog' : undefined}
+          aria-label="Cerrar sesión" onClick={() => { setLogoutError(''); setShowLogoutDialog(true); }}
           style={{
             display: "flex",
             alignItems: "center",
@@ -115,15 +129,17 @@ export default function Sidebar({ activePage, setActivePage }) {
             borderRadius: 8,
             border: "none",
             background: "transparent",
-            color: "#454550",
+            color: "#F1F5F9",
             fontFamily: "Inter, sans-serif",
             fontSize: 14,
             cursor: "pointer"
           }}
         >
-          <LogOut size={18} /> Cerrar Sesión
+          <LogOut size={18} /><span className="sidebar-label">{loggingOut ? 'Cerrando sesión…' : 'Cerrar Sesión'}</span>
         </button>
       </div>
     </aside>
+    {showLogoutDialog && <LogoutDialog onDismiss={() => setShowLogoutDialog(false)} onConfirm={handleLogout} busy={loggingOut} error={logoutError} />}
+    </>
   );
 }

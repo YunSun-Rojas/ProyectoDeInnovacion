@@ -1,0 +1,36 @@
+.dialog {
+  margin: auto;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: 28px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  color: #1f2937;
+  font-family: Inter, system-ui, sans-serif;
+  text-align: center;
+  box-shadow: 0 16px 48px rgb(15 23 42 / 18%);
+  animation: enter 180ms ease-out both;
+}
+.dialog::backdrop { background: rgb(15 23 42 / 38%); animation: fadeIn 180ms ease-out both; }
+.icon { display: grid; place-items: center; width: 52px; height: 52px; margin: 0 auto 18px; border-radius: 50%; background: #fdeaec; color: #e71950; }
+.title { margin: 0; font-size: 20px; line-height: 1.45; font-weight: 700; }
+.actions { display: flex; justify-content: center; gap: 12px; margin-top: 26px; }
+.actions button { flex: 1; min-height: 42px; padding: 10px 14px; border-radius: 8px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 150ms ease; }
+.cancel { border: 1px solid #cbd5e1; background: #fff; color: #475569; }
+.cancel:hover { background: #f1f5f9; }
+.confirm { border: 1px solid #e71950; background: #e71950; color: #fff; }
+.confirm:hover { background: #ca1244; }
+.actions button:focus-visible { outline: 2px solid #e71950; outline-offset: 3px; }
+.actions button:disabled { opacity: .65; cursor: default; }
+.error { margin: 16px 0 0; color: #991b2a; font-size: 13px; line-height: 1.5; }
+.closing { animation: leave 140ms ease-in both; }
+.closing::backdrop { animation: fadeOut 140ms ease-in both; }
+@keyframes enter { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes leave { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(6px) scale(.98); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+@media (max-width: 380px) { .dialog { padding: 22px 18px; } .title { font-size: 18px; } .actions { gap: 8px; } }
+@media (prefers-reduced-motion: reduce) { .dialog, .dialog::backdrop { animation-duration: 1ms; } .actions button { transition: none; } }

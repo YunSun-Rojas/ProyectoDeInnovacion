@@ -11,6 +11,7 @@ const INPUT_CLASS =
 export function LoginForm() {
   const navigate = useNavigate()
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({ username: '', password: '' })
 
@@ -22,13 +23,16 @@ export function LoginForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (submitting) return
+    setSubmitting(true)
     setError('')
     const result = await loginDemo(formData.username, formData.password)
+    setSubmitting(false)
     if (!result.ok) {
       const message = result.error?.toLowerCase().includes('email not confirmed')
         ? 'El correo todavía no está confirmado en Supabase.'
         : result.error?.toLowerCase().includes('invalid login credentials')
-          ? 'El usuario o la contraseña no coinciden con Supabase.'
+          ? 'El correo o la contraseña no son correctos.'
           : result.error
       setError(message)
       return
@@ -59,26 +63,30 @@ export function LoginForm() {
 
       <form onSubmit={handleSubmit} className={styles.form}>
         <div>
-          <label className="block text-sm font-medium text-gray-500 mb-2">
-            Usuario
+          <label htmlFor="login-email" className="block text-sm font-medium text-gray-500 mb-2">
+            Correo electrónico
           </label>
           <input
-            type="text"
+            id="login-email"
+            type="email"
+            autoComplete="username"
             name="username"
             value={formData.username}
             onChange={handleChange}
-            placeholder="Usuario"
+            placeholder="Correo"
             className={`${INPUT_CLASS} ${styles.input}`}
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-500 mb-2">
+          <label htmlFor="login-password" className="block text-sm font-medium text-gray-500 mb-2">
             Contraseña
           </label>
           <div className="relative">
             <input
+              id="login-password"
+              autoComplete="current-password"
               type={showPassword ? 'text' : 'password'}
               name="password"
               value={formData.password}
@@ -102,9 +110,11 @@ export function LoginForm() {
 
         <button
           type="submit"
+          disabled={submitting}
+          aria-busy={submitting}
           className={`w-full bg-black text-white rounded-xl text-base font-semibold hover:bg-gray-800 active:bg-gray-900 transition-colors ${styles.submit}`}
         >
-          Iniciar sesión
+          {submitting ? 'Ingresando…' : 'Iniciar sesión'}
         </button>
       </form>
     </div>

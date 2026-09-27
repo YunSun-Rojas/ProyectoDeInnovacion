@@ -1,9 +1,8 @@
-import React from "react";
-import { TrendingUp, Sparkles, AlertCircle, ArrowUpRight } from "lucide-react";
+import { TrendingUp, Sparkles, AlertCircle } from "lucide-react";
 
 export default function Prediccion({ products = [] }) {
   return (
-    <div style={{ padding: "32px 40px", background: "#FAF8F5", minHeight: "100vh" }}>
+    <div style={{ padding: "32px 40px", background: "#F1F5F9", minHeight: "100vh" }}>
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <h1 style={{ margin: 0, fontFamily: "Oswald, sans-serif", fontSize: 32, fontWeight: 700, color: "#17171A" }}>
@@ -18,11 +17,11 @@ export default function Prediccion({ products = [] }) {
         </p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", gap: 20 }}>
         {products.slice(0, 4).map((p) => {
           const estimatedDays = Math.floor(p.stock * 1.5) + 2; // Simulación de predicción
           return (
-            <div key={p.id} style={{ background: "#FFF", border: "1px solid #E7E3DC", borderRadius: 12, padding: 20 }}>
+            <div key={p.id} style={{ background: "#FFF", border: "1px solid #E5E7EB", borderRadius: 12, padding: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                 <div>
                   <h3 style={{ margin: 0, fontFamily: "Inter, sans-serif", fontSize: 16, color: "#17171A" }}>{p.name}</h3>
@@ -31,7 +30,7 @@ export default function Prediccion({ products = [] }) {
                 <TrendingUp size={20} color="#D62839" />
               </div>
 
-              <div style={{ margin: "16px 0", padding: "12px", background: "#FAF8F5", borderRadius: 8 }}>
+              <div style={{ margin: "16px 0", padding: "12px", background: "#F1F5F9", borderRadius: 8 }}>
                 <span style={{ fontSize: 12, color: "#6E6C68", display: "block" }}>Agotamiento Estimado</span>
                 <span style={{ fontFamily: "Oswald, sans-serif", fontSize: 24, fontWeight: 600, color: estimatedDays <= 5 ? "#8F1B26" : "#17171A" }}>
                   ~ {estimatedDays} días

@@ -7,14 +7,14 @@ import Prediccion from "./modules/inventario/pages/Prediccion";
 import Vision from "./modules/inventario/pages/Vision";
 import Historial from "./modules/inventario/pages/Historial";
 import Config from "./modules/inventario/pages/Config";
-import { hasDemoSession } from "./modules/auth/services/demoSession";
+import { useAuthSession } from "./modules/auth/services/useAuthSession";
 
-function RequireDemoSession() {
-  return hasDemoSession() ? <InventarioLayout /> : <Navigate to="/login" replace />;
+function RequireDemoSession({ session }) {
+  return session ? <InventarioLayout /> : <Navigate to="/login" replace />;
 }
 
-function LoginRoute() {
-  return hasDemoSession() ? <Navigate to="/dashboard" replace /> : <LoginPage />;
+function LoginRoute({ session }) {
+  return session ? <Navigate to="/dashboard" replace /> : <LoginPage />;
 }
 
 function DashboardRoute() {
@@ -28,11 +28,13 @@ function PrediccionRoute() {
 }
 
 export default function App() {
+  const { session, loading } = useAuthSession();
+  if (loading) return <div role="status" style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#F1F5F9', color: '#1F2937' }}>Cargando sesión…</div>;
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<LoginRoute />} />
-      <Route path="/dashboard" element={<RequireDemoSession />}>
+      <Route path="/login" element={<LoginRoute session={session} />} />
+      <Route path="/dashboard" element={<RequireDemoSession session={session} />}>
         <Route index element={<DashboardRoute />} />
         <Route path="productos" element={<ProductosRoute />} />
         <Route path="prediccion" element={<PrediccionRoute />} />

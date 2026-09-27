@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Eye, Camera, CheckCircle2, RefreshCw } from "lucide-react";
 
 export default function Vision() {
@@ -19,7 +19,7 @@ export default function Vision() {
   };
 
   return (
-    <div style={{ padding: "32px 40px", background: "#FAF8F5", minHeight: "100vh" }}>
+    <div style={{ padding: "32px 40px", background: "#F1F5F9", minHeight: "100vh" }}>
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ margin: 0, fontFamily: "Oswald, sans-serif", fontSize: 32, fontWeight: 700, color: "#17171A" }}>
           Reconocimiento por Visión
@@ -29,9 +29,9 @@ export default function Vision() {
         </p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap: 24 }}>
         {/* Área de Cámara / Carga */}
-        <div style={{ background: "#FFF", border: "2px dashed #E7E3DC", borderRadius: 12, padding: 40, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ background: "#FFF", border: "2px dashed #E5E7EB", borderRadius: 12, padding: 40, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
           <Camera size={48} color="#6E6C68" style={{ marginBottom: 16 }} />
           <h3 style={{ margin: 0, fontFamily: "Inter, sans-serif", fontSize: 16 }}>Capturar o subir imagen</h3>
           <p style={{ fontSize: 13, color: "#6E6C68", marginBottom: 20 }}>Coloque el paquete frente a la cámara web o cargue una foto.</p>
@@ -58,7 +58,7 @@ export default function Vision() {
         </div>
 
         {/* Resultado de la Detección */}
-        <div style={{ background: "#FFF", border: "1px solid #E7E3DC", borderRadius: 12, padding: 28 }}>
+        <div style={{ background: "#FFF", border: "1px solid #E5E7EB", borderRadius: 12, padding: 28 }}>
           <h3 style={{ margin: "0 0 20px 0", fontFamily: "Inter, sans-serif", fontSize: 18 }}>Resultado del Análisis</h3>
 
           {result ? (
