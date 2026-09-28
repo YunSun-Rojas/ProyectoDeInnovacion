@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
-import { TextGradient } from '../../../components/ui/TextGradient'
+import { TextGradient } from './TextGradient'
 import styles from './LoginForm.module.css'
 import { useNavigate } from 'react-router-dom'
 import { loginDemo } from '../services/demoSession'

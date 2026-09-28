@@ -46,7 +46,7 @@ function useClickOutside(ref, handler) {
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export default function Header({ products = [] }) {
+export default function Header({ products = [], inventoryReady = true }) {
   const { session } = useAuthSession();
   const profileName = session?.user?.user_metadata?.full_name;
   const displayName = (typeof profileName === 'string' && profileName.trim()) || session?.user?.email || 'Mi cuenta';
@@ -138,8 +138,8 @@ export default function Header({ products = [] }) {
 
         {/* Resumen numérico compacto */}
         <div className="header-stats" style={{ display: "flex", gap: 20, borderRight: `1px solid ${C.borderFaint}`, paddingRight: 20 }}>
-          <QuickStat label="Valor inv." value={currency(totalValue)} />
-          <QuickStat label="Vendidos / mes" value={`${totalSold} uds.`} />
+          <QuickStat label="Valor inv." value={inventoryReady ? currency(totalValue) : '—'} />
+          <QuickStat label="Vendidos / mes" value={inventoryReady ? `${totalSold} uds.` : '—'} />
         </div>
 
         {/* Selector de rango de fechas */}
@@ -189,7 +189,7 @@ export default function Header({ products = [] }) {
         {/* Botón Exportar */}
         <button
           onClick={handleExportCSV}
-          disabled={exporting}
+          disabled={exporting || !inventoryReady || products.length === 0}
           style={{
             display: "flex", alignItems: "center", gap: 6,
             background: justExported ? C.successTint : C.bg,
@@ -263,13 +263,13 @@ export default function Header({ products = [] }) {
                   fontSize: 10, fontWeight: 700, borderRadius: 10,
                   padding: "2px 7px",
                 }}>
-                  {alerts.length > 0 ? `${alerts.length} activas` : "Sin alertas"}
+                  {!inventoryReady ? 'Sin datos' : alerts.length > 0 ? `${alerts.length} activas` : "Sin alertas"}
                 </span>
               </div>
 
               {/* Cuerpo */}
               <div style={{ maxHeight: 320, overflowY: "auto" }}>
-                {alerts.length === 0 ? (
+                {!inventoryReady ? <p style={{ padding: 16, color: C.muted, fontSize: 13 }}>El inventario aún no está disponible.</p> : alerts.length === 0 ? (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "24px 16px", gap: 8 }}>
                     <CheckCircle2 size={28} color={C.success} />
                     <p style={{ color: C.success, fontSize: 13, fontWeight: 600, margin: 0, textAlign: "center" }}>

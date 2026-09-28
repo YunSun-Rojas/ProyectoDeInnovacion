@@ -1,17 +1,27 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
-import { productosDashboard, categoriasDashboard } from "./data/inventarioReal";
+import { useInventory } from './services/useInventory';
+import s from './pages/Management.module.css';
 
-export default function InventarioLayout() {
+export default function InventarioLayout({ userId }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const activePage = pathname.split("/")[2] || "dashboard";
   const setActivePage = (page) => navigate(page === "dashboard" ? "/dashboard" : `/dashboard/${page}`);
-  const [products, setProducts] = useState(productosDashboard);
-  const categories = categoriasDashboard;
-  const [movements, setMovements] = useState([]);
+  const inventory = useInventory(userId);
+  const { products, status, error, retry } = inventory;
+  const [toast, setToast] = useState(null);
+  const toastTimer = useRef(null);
+  const notify = useCallback((message, type = 'success') => {
+    setToast({ message, type });
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 3500);
+  }, []);
+  useEffect(() => () => {
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+  }, []);
   const [darkMode, setDarkMode] = useState(() => {
     try { return localStorage.getItem('eagle-dark-mode') === 'true'; }
     catch { return false; }
@@ -36,46 +46,44 @@ export default function InventarioLayout() {
     }
     return defaults;
   });
-  const record = (product, type, before, after, reason) => setMovements(previous => [{
-    id: crypto.randomUUID(), date: new Date().toISOString(), product: product.name,
-    sku: product.sku, type, before, after, quantity: after - before, user: 'demo', reason,
-  }, ...previous]);
-
-  const handleAddProduct = (data) => {
-    setProducts(previous => [...previous, { ...data, id: Date.now(), unitsSoldLastMonth: 0, unitsSoldThisMonth: 0 }]);
-    record(data, 'Alta', 0, data.stock, 'Registro de producto');
-  };
-  const handleEditProduct = (id, data) => {
-    const product = products.find(p => p.id === id);
-    setProducts(previous => previous.map(p => p.id === id ? { ...p, ...data } : p));
-    record(data, 'Ajuste', product.stock, data.stock, 'Edición de producto');
-  };
-  const handleDeleteProduct = (id) => {
-    const product = products.find(p => p.id === id);
-    setProducts(previous => previous.filter(p => p.id !== id));
-    record(product, 'Baja', product.stock, 0, 'Eliminación de producto');
-  };
-  const handleAdjustStock = (id, delta) => {
-    const product = products.find(p => p.id === id);
-    const stock = Math.max(0, product.stock + delta);
-    if (stock === product.stock) return;
-    setProducts(previous => previous.map(p => p.id === id ? { ...p, stock } : p));
-    record(product, delta > 0 ? 'Entrada' : 'Salida', product.stock, stock, 'Cambio manual de existencias');
-  };
 
   return (
     <div className="inventory-shell" data-theme={darkMode ? 'dark' : 'light'} style={{ display: "flex", width: "100%", height: "100dvh", overflow: "hidden" }}>
       <Sidebar activePage={activePage} setActivePage={setActivePage} />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, background: "var(--inventory-bg, #F1F5F9)" }}>
-        <Header products={products} />
+        <Header products={products} inventoryReady={status === 'ready'} />
 
         <main className="inventory-main" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-          <Outlet context={{ products, categories, movements, settings, setSettings, darkMode, toggleDarkMode, themeError, defaultMinStock: settings.minStock, onNavigate: setActivePage,
-            onAdd: handleAddProduct, onEdit: handleEditProduct,
-            onDelete: handleDeleteProduct, onAdjustStock: handleAdjustStock }} />
+          {status === 'ready' || activePage === 'configuracion' ? (
+            <Outlet context={{ ...inventory, settings, setSettings, darkMode, toggleDarkMode, themeError, defaultMinStock: settings.minStock, onNavigate: setActivePage, notify }} />
+          ) : (
+            <div className={s.page}>
+              <section className={s.card} aria-busy={status === 'loading'}>
+                {status === 'loading' ? <p className={s.muted} role="status">Cargando inventario…</p> : <>
+                  <p className={s.formError} role="alert">{error}</p>
+                  <button type="button" className={s.button} onClick={retry}>Reintentar</button>
+                </>}
+              </section>
+            </div>
+          )}
         </main>
       </div>
+      {toast && <div role="status" aria-live="polite" style={{
+        position: "fixed",
+        right: 24,
+        bottom: 24,
+        zIndex: 300,
+        maxWidth: "min(380px, calc(100vw - 48px))",
+        padding: "13px 18px",
+        borderRadius: 10,
+        background: toast.type === 'error' ? "var(--inventory-danger, #8F1B26)" : "var(--inventory-accent, #E32636)",
+        color: "#FFF",
+        boxShadow: "0 8px 24px rgb(0 0 0 / 22%)",
+        fontFamily: "Inter, sans-serif",
+        fontSize: 14,
+        fontWeight: 600
+      }}>{toast.message}</div>}
     </div>
   );
 }

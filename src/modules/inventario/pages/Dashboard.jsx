@@ -32,7 +32,6 @@ import {
   Legend,
   ComposedChart,
 } from "recharts";
-import { productosDashboard, categoriasDashboard } from '../data/inventarioReal';
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
   bg:         "var(--inventory-bg, #F1F5F9)",
@@ -119,7 +118,7 @@ const CustomTooltip = ({ active, payload, label, prefix = "" }) => {
 };
 
 // ─── DASHBOARD ─────────────────────────────────────────────────────────────────
-export default function Dashboard({ products = productosDashboard, categories = categoriasDashboard, movements = [], onNavigate }) {
+export default function Dashboard({ products = [], categories = [], movements = [], onNavigate }) {
   const [activeChart, setActiveChart] = useState("valorInventario");
 
   const cardNavigation = (page) => ({

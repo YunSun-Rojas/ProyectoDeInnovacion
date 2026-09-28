@@ -10,7 +10,7 @@ import Config from "./modules/inventario/pages/Config";
 import { useAuthSession } from "./modules/auth/services/useAuthSession";
 
 function RequireDemoSession({ session }) {
-  return session ? <InventarioLayout /> : <Navigate to="/login" replace />;
+  return session ? <InventarioLayout key={session.user.id} userId={session.user.id} /> : <Navigate to="/login" replace />;
 }
 
 function LoginRoute({ session }) {
