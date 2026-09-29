@@ -3,32 +3,19 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@supabase/server": "^1.6.0",
-    "@supabase/supabase-js": "^2.116.0",
-    "lucide-react": "^1.46.0",
-    "motion": "^13.3.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.3"
-  },
-  "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@tailwindcss/vite": "^4.3.3",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.7",
-    "@vitejs/plugin-react": "^6.1.1",
-    "eslint": "^10.10.0",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.6",
-    "globals": "^17.12.0",
-    "tailwindcss": "^4.3.3",
-    "vite": "^8.3.0"
+    "dev": "node scripts/dev.mjs",
+    "dev:frontend": "npm run dev --workspace frontend --",
+    "dev:backend": "npm run dev --workspace backend",
+    "build": "npm run build --workspace frontend",
+    "lint": "npm run lint --workspace frontend",
+    "preview": "node scripts/dev.mjs --preview",
+    "start": "npm run start --workspace backend",
+    "test": "npm run test --workspace backend",
+    "test:backend": "npm run test --workspace backend"
   }
 }

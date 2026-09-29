@@ -1,0 +1,13 @@
+{
+  "name": "proyectodeinnovacion-backend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test tests/*.test.js",
+    "check:connection": "node scripts/check-connection.js"
+  },
+  "dependencies": { "@supabase/supabase-js": "^2.116.0" }
+}
