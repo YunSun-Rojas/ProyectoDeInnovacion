@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
-import { loadInventory, productPayload, saveInventoryChange } from '../src/services/inventoryService.js';
+import { loadInventory, productPayload, saveInventoryChange } from '../src/modules/inventory/inventoryService.js';
 import { productosDashboard, categoriasDashboard } from './fixtures/inventarioReal.js';
 
 const userId = '00000000-0000-4000-8000-000000000001';

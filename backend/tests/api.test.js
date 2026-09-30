@@ -84,6 +84,47 @@ test('API exige sesión, usa cookie HttpOnly y no entrega tokens al navegador', 
   assert.equal((await request('/inventory', { cookie })).status, 401);
 });
 
+test('abrir la raíz del backend sin sesión informa del estado sin exponer inventario', async t => {
+  const { base, request, calls } = await setup(t);
+  const response = await fetch(base + '/');
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type'), /application\/json/);
+  assert.equal(response.headers.get('set-cookie'), null);
+  const data = await response.json();
+  assert.deepEqual(data, { message: 'Eagle Gaming Inventario API funcionando' });
+  assert.equal((await request('/inventory')).status, 401);
+  assert.equal((await request('/auth/session')).status, 401);
+  assert.deepEqual(calls, []);
+});
+
+test('rutas públicas, protegidas y desconocidas conservan sus respuestas', async t => {
+  const { request, login } = await setup(t);
+  const health = await request('/health');
+  assert.equal(health.status, 200);
+  assert.deepEqual(await health.json(), { ok: true });
+  assert.equal((await request('/auth/session')).status, 401);
+  assert.equal((await request('/auth/reauthenticate', { method: 'POST', body: {} })).status, 401);
+  assert.equal((await request('/auth/account', { method: 'PATCH', body: {} })).status, 401);
+  assert.equal((await request('/unknown')).status, 401);
+  const { cookie } = await login();
+  assert.equal((await request('/unknown', { cookie })).status, 404);
+  assert.equal((await request('/auth/login', { cookie })).status, 404);
+  assert.equal((await request('/auth/reauthenticate', { cookie, method: 'POST', body: {} })).status, 200);
+  const logout = await request('/auth/logout', { method: 'POST', body: {} });
+  assert.equal(logout.status, 200);
+  assert.match(logout.headers.get('set-cookie'), /Max-Age=0/);
+});
+
+test('límite de intentos de login se conserva al separar el servicio', async t => {
+  const { request } = await setup(t);
+  for (let i = 0; i < 30; i++) {
+    const response = await request('/auth/login', { method: 'POST', body: { email: 'one@example.test', password: 'wrong' } });
+    assert.equal(response.status, 401);
+  }
+  const blocked = await request('/auth/login', { method: 'POST', body: { email: 'one@example.test', password: 'correct-password' } });
+  assert.equal(blocked.status, 429);
+});
+
 test('API separa usuarios y obtiene la identidad de la sesión, no del navegador', async t => {
   const { request, login, calls } = await setup(t);
   const one = await login('one@example.test');

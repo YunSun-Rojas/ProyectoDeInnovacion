@@ -14,6 +14,7 @@ No contiene conexiones a Supabase, SQL ni validaciones de permisos del servidor.
 | `src/modules/*/pages/` | Pantallas |
 | `src/modules/*/components/` | Elementos de la interfaz |
 | `src/assets/` y `public/` | Imágenes y archivos públicos |
+| `src/shared/components/` y `src/shared/utils/` | Espacios reservados para código compartido entre módulos; contienen `.gitkeep` mientras estén vacíos |
 
 Los archivos `api/` son clientes HTTP: solicitan acciones al servidor.
 Los archivos `hooks/` coordinan el estado de React; no consultan la base de datos.

@@ -8,10 +8,18 @@ Supabase. Iniciarla no crea tablas, no importa productos y no ejecuta pruebas.
 | Archivo o carpeta | Responsabilidad |
 |---|---|
 | `src/server.js` | Iniciar y detener el servidor HTTP |
-| `src/app.js` | Recibir solicitudes, gestionar sesiones y comprobar el acceso |
+| `src/app.js` | Componer módulos, despachar rutas y responder errores HTTP |
 | `src/config.js` | Leer la configuración del backend desde `.env` |
 | `src/database/supabaseClient.js` | Crear la conexión de cada sesión con Supabase |
-| `src/services/inventoryService.js` | Consultar datos, validar productos y ejecutar el guardado |
+| `src/modules/auth/authRoutes.js` | Declarar rutas de autenticación y su acceso público o protegido |
+| `src/modules/auth/authController.js` | Leer solicitudes y responder con cookies y datos de usuario |
+| `src/modules/auth/authService.js` | Gestionar sesiones, intentos de login y cambios de cuenta |
+| `src/modules/inventory/inventoryRoutes.js` | Declarar rutas de inventario |
+| `src/modules/inventory/inventoryController.js` | Validar solicitudes y coordinar consultas y cambios |
+| `src/modules/inventory/inventoryService.js` | Validar y transformar datos y resultados de guardado |
+| `src/modules/inventory/inventoryRepository.js` | Consultar tablas paginadas, permisos y funciones RPC |
+| `src/middleware/authMiddleware.js` | Validar la sesión antes de ejecutar una ruta protegida |
+| `src/utils/http.js` | Leer JSON, comprobar el origen y construir errores HTTP |
 | `scripts/check-connection.js` | Comprobar manualmente la conexión con Supabase |
 | `tests/` | Verificar el código de forma aislada |
 
@@ -43,6 +51,7 @@ No se guardan contraseñas ni se envían tokens al frontend.
 
 | Método | Ruta | Función |
 |---|---|---|
+| GET | / | Mensaje público: Eagle Gaming Inventario API funcionando |
 | GET | /api/health | Estado del proceso |
 | POST | /api/auth/login | Iniciar sesión |
 | GET | /api/auth/session | Consultar usuario autenticado |

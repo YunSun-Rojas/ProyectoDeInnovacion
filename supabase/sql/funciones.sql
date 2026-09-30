@@ -1,0 +1,3 @@
+-- Pendiente: incorporar las definiciones reales de funciones del proyecto Supabase.
+-- Este archivo organiza la estructura solicitada y no ejecuta cambios.
+-- No reconstruir el esquema de producción a partir del código cliente.

@@ -15,22 +15,33 @@ ProyectoDeInnovacion/
 │   │       ├── pages/        # Pantallas
 │   │       └── components/   # Componentes visuales
 │   ├── public/
+│   ├── src/shared/           # components/ y utils/ para código compartido
 │   └── package.json
 ├── backend/
 │   ├── src/server.js         # Inicio del servidor
-│   ├── src/app.js            # Endpoints, autenticación y autorización
+│   ├── src/app.js            # Composición de módulos y despacho HTTP
+│   ├── src/modules/
+│   │   ├── auth/            # authRoutes, authController y authService
+│   │   └── inventory/       # inventoryRoutes, inventoryController,
+│   │                       # inventoryService e inventoryRepository
+│   ├── src/middleware/      # Validación de sesiones
+│   ├── src/utils/           # JSON, origen y errores HTTP
 │   ├── src/config.js         # Configuración privada del servidor
 │   ├── src/database/         # Cliente de Supabase
 │   ├── scripts/              # Comprobación de conexión real
 │   ├── tests/                # Pruebas aisladas; no intervienen en la aplicación
 │   ├── .env                  # URL y clave de Supabase (no se versiona)
 │   └── package.json
+├── supabase/sql/            # tablas.sql, funciones.sql y politicas.sql
 ├── scripts/dev.mjs          # Inicia frontend y backend juntos
 ├── package.json
 └── package-lock.json
 ```
 
 Flujo: **pantalla → /api → backend → Supabase**.
+En el backend: **ruta → middleware de sesión → controlador → servicio → repositorio → Supabase**.
+Los archivos de `supabase/sql/` contienen únicamente comentarios pendientes de las
+definiciones reales; no son migraciones ejecutables. Ver [supabase/README.md](supabase/README.md).
 El navegador no importa el SDK de Supabase ni realiza consultas a sus tablas.
 El backend utiliza los permisos de la cuenta autenticada; no usa una clave de administrador.
 
@@ -47,8 +58,8 @@ Esto inicia la API en el puerto 3001 y Vite en el puerto indicado en la terminal
 Al detener el comando se detienen ambos procesos. Tras cambiar esta estructura,
 detén el servidor anterior e inicia sesión nuevamente.
 
-La configuración existente fue trasladada a `backend/.env`. Para una copia nueva,
-copia `backend/.env.example` a `backend/.env` y completa los valores.
+La configuración existente está en `backend/.env`. Para una copia nueva,
+crea `backend/.env` con `SUPABASE_URL` y `SUPABASE_ANON_KEY` del proyecto.
 No se necesitan credenciales de Supabase en el frontend. El proxy de Vite dirige
 `/api` a `http://127.0.0.1:3001`; si cambias PORT, ajusta también ese destino.
 
