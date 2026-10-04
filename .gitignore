@@ -26,4 +26,16 @@ dist-ssr
 *.sln
 *.sw?
 
+# Python virtual environments
 venv/
+.venv/
+
+# Python temporary files
+__pycache__/
+*.pyc
+*.pyo
+
+# YOLO generated files
+backend/yolo/runs/
+backend/yolo/*.pt
+backend/yolo/bus.jpg
