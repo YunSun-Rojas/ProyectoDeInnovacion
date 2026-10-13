@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
+import { DATE_RANGES, limaDate, periodRange, summarizeMovements } from './pages/dashboardData';
+import { summarizeSales } from './pages/salesData';
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import { useInventory } from "./hooks/useInventory";
@@ -29,6 +31,12 @@ export default function InventarioLayout({ userId }) {
     error,
     retry,
   } = inventory;
+
+  const [selectedRange, setSelectedRange] = useState('month');
+  const today = limaDate(new Date());
+  const rangeConfig = DATE_RANGES.find(range => range.id === selectedRange) || DATE_RANGES.find(range => range.id === 'month');
+  const activity = useMemo(() => summarizeMovements(inventory.movements, periodRange(selectedRange, today)), [inventory.movements, selectedRange, today]);
+  const salesSummary = useMemo(() => summarizeSales(inventory.sales, periodRange(selectedRange, today)), [inventory.sales, selectedRange, today]);
 
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
@@ -142,6 +150,12 @@ export default function InventarioLayout({ userId }) {
         <Header
           products={products}
           inventoryReady={status === "ready"}
+          selectedRange={selectedRange}
+          onRangeChange={setSelectedRange}
+          activity={activity}
+          salesSummary={salesSummary}
+          salesEnabled={inventory.salesEnabled}
+          historyAvailable={!inventory.readOnly}
         />
 
         <main
@@ -156,6 +170,9 @@ export default function InventarioLayout({ userId }) {
             <Outlet
               context={{
                 ...inventory,
+                activity,
+                salesSummary,
+                rangeLabel: rangeConfig.label,
                 products,
                 categories,
                 settings,

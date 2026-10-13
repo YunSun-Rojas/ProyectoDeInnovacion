@@ -4,12 +4,15 @@ export async function loadInventory(client, userId, signal) {
   if (!client) throw new Error('No se ha configurado la conexión con Supabase.');
   if (!userId) throw new Error('Inicia sesión para consultar el inventario.');
   signal?.throwIfAborted();
-  const { categoryRows, productRows, movementRows, readOnly } = await readInventory(client, userId, signal);
+  const { categoryRows, productRows, movementRows, salesRows, salesEnabled, readOnly } = await readInventory(client, userId, signal);
   const categories = categoryRows.map(category => ({ id: `c${category.id}`, name: category.name }));
+  const sales = salesRows.map(mapSale);
+  const saleByMovement = new Map(sales.map(sale => [sale.movementId, sale]));
   return {
     products: productRows.map(product => mapProduct(product, categories)),
     categories,
-    movements: movementRows.map(mapMovement).reverse(),
+    movements: movementRows.map(row => mapMovement(row, saleByMovement.get(String(row.id)))).reverse(),
+    sales, salesEnabled,
     readOnly,
   };
 }
@@ -37,10 +40,33 @@ export function mapProduct(product, categories) {
   };
 }
 
-export function mapMovement(row) {
+export function mapMovement(row, sale) {
   return { id: row.id, date: row.created_at, product: row.product_name, sku: row.sku,
     type: row.type, before: row.stock_before, after: row.stock_after, quantity: row.quantity,
-    user: row.actor_email, reason: row.reason };
+    user: row.actor_email, reason: row.reason,
+    ...(sale ? { type: 'Venta', saleId: sale.id, unitPrice: sale.unitPrice, total: sale.total } : {}) };
+}
+
+export function mapSale(row) {
+  const quantity = Number(row.quantity), unitPrice = Number(row.unit_price), total = Number(row.total);
+  if (!row.id || !row.created_at || !Number.isSafeInteger(quantity) || quantity <= 0
+    || row.unit_price == null || row.total == null || !Number.isFinite(unitPrice) || unitPrice < 0
+    || !Number.isSafeInteger(Math.round(total * 100)) || total < 0
+    || Math.round(total * 100) !== quantity * Math.round(unitPrice * 100)) {
+    throw new Error('El historial de ventas contiene un registro incompleto. Revisa la base de datos.');
+  }
+  return { id: row.id, productId: row.product_id, product: row.product_name, sku: row.sku,
+    quantity, unitPrice, total, movementId: String(row.movement_id), date: row.created_at, user: row.actor_email };
+}
+
+export function salePayload(data) {
+  if (!Number.isSafeInteger(data.quantity) || data.quantity <= 0 || data.quantity > 2147483647
+    || typeof data.unitPrice !== 'number' || !Number.isFinite(data.unitPrice)
+    || data.unitPrice < 0 || data.unitPrice >= 1e10 || Number(data.unitPrice.toFixed(2)) !== data.unitPrice
+    || !Number.isSafeInteger(data.quantity * Math.round(data.unitPrice * 100))) {
+    throw new Error('Ingresa una cantidad entera positiva y un precio de venta válido de hasta dos decimales.');
+  }
+  return { quantity: data.quantity, unit_price: data.unitPrice };
 }
 
 export function productPayload(data) {
@@ -86,7 +112,7 @@ export async function saveInventoryChange(client, request) {
       : ['42501', 'PGRST301', 'PGRST303'].includes(code) ? 'Tu sesión no permite guardar. Inicia sesión nuevamente.' : null);
     throw Object.assign(new Error(known || 'No se pudo confirmar el guardado. Reintenta la operación para comprobarla sin duplicarla.'), { uncertain: !known });
   }
-  if (!response.data?.movement) {
+  if (!response.data?.movement || (request.p_action === 'sale' && !response.data.sale)) {
     throw Object.assign(new Error('No se pudo confirmar el resultado. Reintenta la operación.'), { uncertain: true });
   }
   return response.data;

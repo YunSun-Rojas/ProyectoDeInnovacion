@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { DATE_RANGES, limaDate, movementFlow } from '../pages/dashboardData';
 import { useAuthSession } from '../../auth/hooks/useAuthSession';
 import {
   Calendar,
@@ -35,14 +36,6 @@ const FONT = { body: "Inter, system-ui, sans-serif" };
 const currency = (v) =>
   `S/. ${v.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const DATE_RANGES = [
-  { label: "Hoy", shortLabel: "hoy", multiplier: 1 / 30 },
-  { label: "Últimos 7 días", shortLabel: "7d", multiplier: 7 / 30 },
-  { label: "Últimos 30 días", shortLabel: "30d", multiplier: 1 },
-  { label: "Este mes", shortLabel: "mes", multiplier: 1 },
-  { label: "Trimestre actual", shortLabel: "trim", multiplier: 3 },
-];
-
 function useClickOutside(ref, handler) {
   useEffect(() => {
     const listener = (e) => { if (ref.current && !ref.current.contains(e.target)) handler(); };
@@ -52,20 +45,19 @@ function useClickOutside(ref, handler) {
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export default function Header({ products = [], inventoryReady = true }) {
+export default function Header({ products = [], inventoryReady = true, selectedRange = 'month', onRangeChange, activity = { recent: [] }, historyAvailable = false, salesSummary = { total: 0, units: 0 }, salesEnabled = false }) {
   const { session } = useAuthSession();
   const profileName = session?.user?.user_metadata?.full_name;
   const displayName = (typeof profileName === 'string' && profileName.trim()) || session?.user?.email || 'Mi cuenta';
   const initials = displayName.split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showDatePicker,    setShowDatePicker]    = useState(false);
-  const [selectedRange,     setSelectedRange]     = useState("Últimos 30 días");
   const [exporting,         setExporting]         = useState(false);
   const [justExported,      setJustExported]      = useState(false);
 
   const notifRef   = useRef(null);
   const dateRef    = useRef(null);
-  const selectedRangeConfig = DATE_RANGES.find(({ label }) => label === selectedRange) ?? DATE_RANGES[2];
+  const selectedRangeConfig = DATE_RANGES.find(({ id }) => id === selectedRange) ?? DATE_RANGES.find(range => range.id === 'month');
 
   useClickOutside(notifRef, () => setShowNotifications(false));
   useClickOutside(dateRef,  () => setShowDatePicker(false));
@@ -77,7 +69,6 @@ export default function Header({ products = [], inventoryReady = true }) {
 
   // KPI rápido para el header
   const totalValue  = products.reduce((s, p) => s + p.stock * p.price, 0);
-  const totalSoldInRange = products.reduce((s, p) => s + ((p.unitsSoldThisMonth ?? 0) * selectedRangeConfig.multiplier), 0);
 
   // Exportar CSV enriquecido
   const handleExportCSV = () => {
@@ -88,10 +79,20 @@ export default function Header({ products = [], inventoryReady = true }) {
       const headers = [
         "ID", "Nombre", "SKU", "Categoría",
         "Stock Actual", "Stock Mínimo", "Precio (S/.)",
-        "Valor en Inv. (S/.)", "Vendidos (mes)", "Ingresos (mes, S/.)",
+        "Valor en Inv. (S/.)", `Entradas (${selectedRangeConfig.label})`, `Salidas (${selectedRangeConfig.label})`, `Cambios registrados (${selectedRangeConfig.label})`,
         "Estado",
       ];
+      const bySku = new Map();
+      activity.recent.forEach(m => {
+        const totals = bySku.get(m.sku) || { entries: 0, exits: 0, changes: 0 };
+        totals.changes++;
+        const flow = movementFlow(m);
+        totals.entries += flow.entries;
+        totals.exits += flow.exits;
+        bySku.set(m.sku, totals);
+      });
       const rows = products.map(p => {
+        const totals = bySku.get(p.sku) || { entries: 0, exits: 0, changes: 0 };
         const estado = p.stock === 0 ? "Sin Stock" : p.stock <= p.minStock ? "Stock Bajo" : "OK";
         return [
           p.id,
@@ -102,8 +103,9 @@ export default function Header({ products = [], inventoryReady = true }) {
           p.minStock,
           p.price,
           (p.stock * p.price).toFixed(2),
-          p.unitsSoldThisMonth ?? 0,
-          ((p.unitsSoldThisMonth ?? 0) * p.price).toFixed(2),
+          historyAvailable ? totals.entries : 'No disponible',
+          historyAvailable ? totals.exits : 'No disponible',
+          historyAvailable ? totals.changes : 'No disponible',
           estado,
         ];
       });
@@ -113,7 +115,7 @@ export default function Header({ products = [], inventoryReady = true }) {
       const url  = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `Reporte_Inventario_EagleGaming_${selectedRangeConfig.shortLabel}_${new Date().toISOString().slice(0, 10)}.csv`;
+      link.download = `Reporte_Inventario_EagleGaming_${selectedRangeConfig.shortLabel}_${limaDate(new Date())}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -131,7 +133,8 @@ export default function Header({ products = [], inventoryReady = true }) {
       justifyContent: "space-between",
       alignItems:     "center",
       padding:        "0 36px",
-      height:         58,
+      minHeight:      58,
+      flexWrap:       "wrap",
       background:     C.surface,
       borderBottom:   `1px solid ${C.border}`,
       position:       "sticky",
@@ -146,12 +149,15 @@ export default function Header({ products = [], inventoryReady = true }) {
         {/* Resumen numérico compacto */}
         <div className="header-stats" style={{ display: "flex", gap: 20, borderRight: `1px solid ${C.borderFaint}`, paddingRight: 20 }}>
           <QuickStat label="Valor inv." value={inventoryReady ? currency(totalValue) : '—'} />
-          <QuickStat label={selectedRangeConfig.label === "Este mes" ? "Vendidos / mes" : `Vendidos / ${selectedRangeConfig.shortLabel}`} value={inventoryReady ? `${Math.round(totalSoldInRange)} uds.` : '—'} />
+          <QuickStat label={`Ventas / ${selectedRangeConfig.shortLabel}`} value={inventoryReady && salesEnabled ? currency(salesSummary.total) : '—'} />
+          <QuickStat label={`Unidades vendidas / ${selectedRangeConfig.shortLabel}`} value={inventoryReady && salesEnabled ? `${salesSummary.units}` : '—'} />
         </div>
 
         {/* Selector de rango de fechas */}
         <div ref={dateRef} style={{ position: "relative" }}>
           <button
+            aria-expanded={showDatePicker}
+            aria-label={`Período: ${selectedRangeConfig.label}`}
             onClick={() => setShowDatePicker(!showDatePicker)}
             style={{
               display: "flex", alignItems: "center", gap: 6,
@@ -162,7 +168,7 @@ export default function Header({ products = [], inventoryReady = true }) {
             }}
           >
             <Calendar size={13} color={C.muted} />
-            {selectedRange}
+            {selectedRangeConfig.label}
             <ChevronDown size={13} color={C.muted} />
           </button>
 
@@ -176,13 +182,13 @@ export default function Header({ products = [], inventoryReady = true }) {
               {DATE_RANGES.map(r => (
                 <button
                   key={r.label}
-                  onClick={() => { setSelectedRange(r.label); setShowDatePicker(false); }}
+                  onClick={() => { onRangeChange?.(r.id); setShowDatePicker(false); }}
                   style={{
                     display: "block", width: "100%", textAlign: "left",
                     padding: "8px 12px", borderRadius: 7, border: "none",
-                    background: r.label === selectedRange ? C.accentTint : "transparent",
-                    color: r.label === selectedRange ? C.accent : C.inkSecond,
-                    fontFamily: FONT.body, fontSize: 13, fontWeight: r.label === selectedRange ? 600 : 400,
+                    background: r.id === selectedRange ? C.accentTint : "transparent",
+                    color: r.id === selectedRange ? C.accent : C.inkSecond,
+                    fontFamily: FONT.body, fontSize: 13, fontWeight: r.id === selectedRange ? 600 : 400,
                     cursor: "pointer",
                   }}
                 >

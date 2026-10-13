@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
-import { loadInventory, productPayload, saveInventoryChange } from '../src/modules/inventory/inventoryService.js';
+import { loadInventory, productPayload, saveInventoryChange, salePayload, mapSale, mapMovement } from '../src/modules/inventory/inventoryService.js';
 import { productosDashboard, categoriasDashboard } from './fixtures/inventarioReal.js';
 
 const userId = '00000000-0000-4000-8000-000000000001';
@@ -12,7 +12,7 @@ const products = productosDashboard.map(p => ({
   stock: p.stock, price: p.price.toFixed(2), min_stock: p.minStock,
 }));
 
-function server({ member = true, rows = products, categoryRows = categories, cap = 500, failure, missingCount = false, enabled = false, movements = [] } = {}) {
+function server({ member = true, rows = products, categoryRows = categories, cap = 500, failure, missingCount = false, enabled = false, movements = [], salesEnabled = false, sales = [] } = {}) {
   const requests = [];
   const client = createClient('https://inventory-test.invalid', 'test-publishable-key', {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -21,13 +21,14 @@ function server({ member = true, rows = products, categoryRows = categories, cap
       const url = new URL(input);
       const table = url.pathname.split('/').at(-1);
       requests.push({ table, method: options.method, query: url.searchParams });
+      if (table === 'inventory_sales_enabled') return new Response(JSON.stringify(salesEnabled));
       if (table === 'inventory_write_enabled') return enabled === null
         ? new Response(JSON.stringify({ code: 'PGRST202', message: 'Missing function' }), { status: 404 })
         : new Response(JSON.stringify(enabled));
       if (table === failure) return new Response(JSON.stringify({ code: '42P01', message: 'Missing table' }), { status: 404 });
       let data;
       if (table === 'inventory_members') data = member ? [{ user_id: userId }] : [];
-      else data = table === 'products' ? rows : table === 'inventory_movements' ? movements : categoryRows;
+      else data = table === 'products' ? rows : table === 'inventory_movements' ? movements : table === 'inventory_sales' ? sales : categoryRows;
       const offset = Number(url.searchParams.get('offset') || 0);
       const limit = Math.min(cap, Number(url.searchParams.get('limit') || 500));
       const page = data.slice(offset, offset + limit);
@@ -75,7 +76,7 @@ test('una tabla inexistente produce error, nunca productos locales', async () =>
 
 test('un inventario vacío autorizado permanece vacío', async () => {
   const { client } = server({ rows: [], categoryRows: [] });
-  assert.deepEqual(await loadInventory(client, userId), { products: [], categories: [], movements: [], readOnly: true });
+  assert.deepEqual(await loadInventory(client, userId), { products: [], categories: [], movements: [], sales: [], salesEnabled: false, readOnly: true });
 });
 
 test('habilita la edición y adapta el historial cuando la fase 4 está instalada', async () => {
@@ -148,4 +149,33 @@ test('no consulta el servidor si la petición fue cancelada o falta la sesión',
   await assert.rejects(loadInventory(client, null), /Inicia sesión/);
   await assert.rejects(loadInventory(null, userId), /No se ha configurado/);
   assert.equal(requests.length, 0);
+});
+
+test('ventas valida importes y conserva el precio histórico separado del producto', async () => {
+  assert.deepEqual(salePayload({ quantity: 2, unitPrice: 80 }), { quantity: 2, unit_price: 80 });
+  for (const data of [{ quantity: 0, unitPrice: 80 }, { quantity: 1.5, unitPrice: 80 }, { quantity: 2, unitPrice: -1 }, { quantity: 2, unitPrice: 1.555 }, { quantity: 2, unitPrice: '80' }]) {
+    assert.throws(() => salePayload(data), /cantidad entera/);
+  }
+  const raw = { id: 'sale-1', product_id: 1, product_name: 'Mouse', sku: 'M-1', quantity: 2, unit_price: '80.00', total: '160.00', movement_id: '7', created_at: '2026-10-13T15:00:00Z', actor_email: 'admin@example.test' };
+  const { client } = server({ enabled: true, salesEnabled: true, rows: [{ ...products[0], price: '90.00', version: 4 }], sales: [raw], movements: [{ id: 7, type: 'Ajuste', quantity: -2, stock_before: 5, stock_after: 3, created_at: raw.created_at }] });
+  const result = await loadInventory(client, userId);
+  assert.equal(result.products[0].price, 90);
+  assert.equal(result.sales[0].total, 160);
+  assert.equal(result.sales[0].unitPrice, 80);
+  assert.equal(result.movements[0].type, 'Venta');
+  assert.equal(result.movements[0].total, 160);
+  assert.equal(result.salesEnabled, true);
+  assert.equal(mapMovement({ id: 1, type: 'Salida' }).type, 'Salida');
+  assert.throws(() => mapSale({ ...raw, total: '999' }), /incompleto/);
+});
+
+test('venta usa una RPC atómica con el precio aplicado y el mismo ID al reintentar', async () => {
+  const calls = [];
+  const client = { rpc: async (name, args) => { calls.push({ name, args }); return { data: { product: { id: 1 }, movement: { id: 2 }, sale: { id: 'request-sale' } } }; } };
+  const request = { p_action: 'sale', p_request_id: 'request-sale', p_product_id: 1, p_expected_version: 3, p_data: { quantity: 2, unit_price: 80 } };
+  await saveInventoryChange(client, request);
+  await saveInventoryChange(client, request);
+  assert.deepEqual(calls[0], { name: 'inventory_register_sale', args: { p_request_id: 'request-sale', p_product_id: 1, p_expected_version: 3, p_quantity: 2, p_unit_price: 80 } });
+  assert.deepEqual(calls[0], calls[1]);
+  await assert.rejects(saveInventoryChange({ rpc: async () => ({ data: { movement: { id: 2 } } }) }, request), error => error.uncertain === true);
 });

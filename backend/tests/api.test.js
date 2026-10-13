@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createApi } from '../src/app.js';
+import { salePayload, mapSale, mapMovement } from '../src/modules/inventory/inventoryService.js';
 
 async function setup(t, options = {}) {
   const calls = [];
@@ -25,6 +26,8 @@ async function setup(t, options = {}) {
     productPayload: value => value,
     mapProduct: value => value,
     mapMovement: value => value,
+    salePayload,
+    mapSale,
     ...options.inventory,
   };
   const server = createApi({ secure: true }, { clientFactory, inventory });
@@ -143,6 +146,21 @@ test('API rechaza orígenes externos, credenciales incorrectas y cambios inváli
   assert.equal(calls.length, 0);
 });
 
+test('API admite cantidades completas y rechaza movimientos inválidos antes de escribir', async t => {
+  const { request, login, calls } = await setup(t);
+  const { cookie } = await login();
+  const base = { requestId: '00000000-0000-4000-8000-000000000001', action: 'adjust', productId: 1, version: 2 };
+  for (const delta of [0, 1.5, '6', null, 2147483648, -2147483648]) {
+    assert.equal((await request('/inventory/changes', { cookie, method: 'POST', body: { ...base, data: { delta } } })).status, 400);
+  }
+  assert.equal(calls.length, 0);
+  for (const delta of [6, -3]) {
+    assert.equal((await request('/inventory/changes', { cookie, method: 'POST', body: { ...base, data: { delta } } })).status, 200);
+    assert.deepEqual(calls.at(-1).request.p_data, { delta });
+    assert.equal(calls.at(-1).request.p_expected_version, 2);
+  }
+});
+
 test('API conserva requestId y la incertidumbre de un reintento sin duplicar la intención', async t => {
   const writes = [];
   const { request, login } = await setup(t, { inventory: {
@@ -178,4 +196,35 @@ test('API bloquea escritura de cuentas de solo lectura y comprueba contraseña a
   assert.equal(failed.status, 400);
   assert.equal((await failed.json()).code, 'invalid_credentials');
   assert.equal((await request('/auth/account', { cookie, method: 'PATCH', body: { mode: 'profile', name: 'Alex' } })).status, 200);
+});
+
+test('API valida ventas, exige versión y usa identidad de sesión sin recalcular el precio aplicado', async t => {
+  const sale = { id: 'sale-1', product_id: 1, product_name: 'Mouse', sku: 'M1', quantity: 2, unit_price: 80, total: 160, movement_id: '2', created_at: '2026-10-13T18:00:00Z', actor_email: 'one@example.test' };
+  const { request, login, calls } = await setup(t, { inventory: {
+    loadInventory: async () => ({ readOnly: false, salesEnabled: true, categories: [] }),
+    mapMovement,
+    saveInventoryChange: async (_client, value) => { calls.push(value); return { product: { id: 1, price: 90, stock: 3 }, movement: { id: 2, type: 'Ajuste', quantity: -2 }, sale }; },
+  } });
+  const { cookie } = await login();
+  const body = { requestId: '00000000-0000-4000-8000-000000000001', action: 'sale', productId: 1, version: 2, data: { quantity: 2, unitPrice: 80, actorId: 'forged' } };
+  for (const invalid of [{ ...body, version: null }, { ...body, data: { quantity: 0, unitPrice: 80 } }, { ...body, data: { quantity: 2, unitPrice: 1.234 } }]) {
+    assert.equal((await request('/inventory/changes', { cookie, method: 'POST', body: invalid })).status, 400);
+  }
+  assert.equal(calls.length, 0);
+  const response = await request('/inventory/changes', { cookie, method: 'POST', body });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.sale.total, 160);
+  assert.equal(result.product.price, 90);
+  assert.equal(result.movement.type, 'Venta');
+  assert.deepEqual(calls[0].p_data, { quantity: 2, unit_price: 80 });
+});
+
+test('API no intenta registrar ventas antes de habilitar el historial en Supabase', async t => {
+  let writes = 0;
+  const { request, login } = await setup(t, { inventory: { saveInventoryChange: async () => { writes++; } } });
+  const { cookie } = await login();
+  const response = await request('/inventory/changes', { cookie, method: 'POST', body: { requestId: '00000000-0000-4000-8000-000000000001', action: 'sale', productId: 1, version: 2, data: { quantity: 1, unitPrice: 80 } } });
+  assert.equal(response.status, 409);
+  assert.equal(writes, 0);
 });

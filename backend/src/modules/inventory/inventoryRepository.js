@@ -42,15 +42,24 @@ export async function readInventory(client, userId, signal) {
   const capability = await client.rpc('inventory_write_enabled', {}, { get: true }).abortSignal(signal);
   if (capability.error && !['PGRST202', '42883'].includes(capability.error.code)) checkResponse(capability);
   const readOnly = capability.data !== true;
-  const [categoryRows, productRows, movementRows] = await Promise.all([
+  const salesCapability = await client.rpc('inventory_sales_enabled', {}, { get: true }).abortSignal(signal);
+  if (salesCapability.error && !['PGRST202', '42883'].includes(salesCapability.error.code)) checkResponse(salesCapability);
+  const salesEnabled = salesCapability.data === true;
+  const [categoryRows, productRows, movementRows, salesRows] = await Promise.all([
     readRows(client, 'categories', 'id,name', signal),
     readRows(client, 'products', `id,sku,name,category_id,stock,price,min_stock${readOnly ? '' : ',version'}`, signal),
     readOnly ? [] : readRows(client, 'inventory_movements', 'id,product_name,sku,type,stock_before,stock_after,quantity,actor_email,reason,created_at', signal),
+    salesEnabled ? readRows(client, 'inventory_sales', 'id,product_id,product_name,sku,quantity,unit_price,total,movement_id,actor_email,created_at', signal) : [],
   ]);
   signal?.throwIfAborted();
-  return { categoryRows, productRows, movementRows, readOnly };
+  return { categoryRows, productRows, movementRows, salesRows, salesEnabled, readOnly };
 }
 
 export function mutateInventory(client, request) {
+  if (request.p_action === 'sale') return client.rpc('inventory_register_sale', {
+    p_request_id: request.p_request_id, p_product_id: request.p_product_id,
+    p_expected_version: request.p_expected_version,
+    p_quantity: request.p_data.quantity, p_unit_price: request.p_data.unit_price,
+  });
   return client.rpc('inventory_mutate', request);
 }

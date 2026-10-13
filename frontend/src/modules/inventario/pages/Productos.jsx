@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import SaleDialog from "../components/SaleDialog";
 
 import {
   Search,
@@ -727,6 +728,8 @@ export default function Productos({
   onAdd,
   onEdit,
   onDelete,
+  onSale,
+  salesEnabled = false,
   readOnly = true,
   saving = false,
   writeError = "",
@@ -745,7 +748,8 @@ export default function Productos({
 
   const [sort, setSort] = useState("name");
   const [pageSize, setPageSize] = useState(15);
-  const [modal, setModal] = useState(null);
+  const [modal, setModal] = useState(() => params.get("accion") === "nuevo" && !readOnly ? { product: null, trigger: null } : null);
+  const [saleOpen, setSaleOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState("");
 
@@ -895,11 +899,18 @@ export default function Productos({
     });
   }
 
+  function clearCreateAction() {
+    if (params.get("accion") === "nuevo") {
+      setParams(previous => { const next = new URLSearchParams(previous); next.delete("accion"); return next; }, { replace: true });
+    }
+  }
+
   function closeModal() {
     if (busyRef.current || saving || uncertain) return;
 
-    const trigger = modal?.trigger;
+    const trigger = modal?.trigger || newButton.current;
     setModal(null);
+    clearCreateAction();
 
     requestAnimationFrame(() => trigger?.focus());
   }
@@ -919,6 +930,7 @@ export default function Productos({
         if (close) {
           const trigger = modal?.trigger;
           setModal(null);
+          clearCreateAction();
           requestAnimationFrame(() => trigger?.focus());
         }
 
@@ -1022,6 +1034,7 @@ export default function Productos({
         </div>
 
         <div className="inv-actions">
+          <button type="button" className="inv-button" disabled={!salesEnabled || readOnly || busy || uncertain || !products.some(p => p.stock > 0)} title={salesEnabled ? "Registrar una salida por venta" : "El registro de ventas está pendiente de habilitación"} onClick={() => setSaleOpen(true)}>Registrar venta</button>
           <button
             type="button"
             className="inv-button"
@@ -1394,6 +1407,10 @@ export default function Productos({
         </footer>
       </section>
 
+      {saleOpen && <SaleDialog products={products} saving={saving} uncertain={uncertain} error={writeError}
+        onSave={onSale} onRetry={retryWrite} onClose={() => setSaleOpen(false)}
+        onSuccess={() => { setSaleOpen(false); notify('Venta registrada. El precio aplicado queda guardado en el historial.'); }} />}
+
       {modal && !readOnly && (
         <ProductModal
           product={modal.product}
@@ -1526,6 +1543,10 @@ function ProductModal({
   }
 
   function submit(event) {
+    event.preventDefault();
+    if (disabled) return;
+    const problem = validateProduct(form, products, product?.id);
+    if (problem) { setValidation(problem); return; }
     if (!form.createdByName.trim()) {
       setValidation("Escribe el nombre de quien registra el producto.");
       return;

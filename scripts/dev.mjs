@@ -10,7 +10,7 @@ const args = process.argv.slice(2);
 const preview = args[0] === '--preview';
 if (preview) args.shift();
 const children = [
-  spawn(process.execPath, ['backend/src/server.js'], { cwd: root, stdio: 'inherit' }),
+  spawn(process.execPath, [...(preview ? [] : ['--watch']), 'backend/src/server.js'], { cwd: root, stdio: 'inherit' }),
   spawn(process.execPath, [vite, ...(preview ? ['preview'] : []), ...args], { cwd: join(root, 'frontend'), stdio: 'inherit' }),
 ];
 let stopping = false;

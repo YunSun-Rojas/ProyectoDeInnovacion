@@ -59,7 +59,7 @@ No se guardan contraseñas ni se envían tokens al frontend.
 | PATCH | /api/auth/account | Actualizar perfil o contraseña |
 | POST | /api/auth/reauthenticate | Solicitar código de verificación |
 | GET | /api/inventory | Consultar productos, categorías e historial |
-| POST | /api/inventory/changes | Agregar, editar, eliminar o ajustar stock |
+| POST | /api/inventory/changes | Agregar, editar, eliminar, ajustar stock o registrar una venta |
 
 El usuario de una operación se obtiene de la sesión verificada; no se acepta
 un identificador de usuario enviado por el navegador. Una cuenta debe estar
@@ -67,11 +67,20 @@ autorizada en `inventory_members`. El guardado requiere las funciones
 `inventory_write_enabled` e `inventory_mutate` ya instaladas en Supabase.
 La API mantiene modo de lectura si el proyecto aún no habilita escrituras.
 
+La acción `sale` recibe `requestId`, `productId`, `version` y
+`data: { quantity, unitPrice }`. Usa `inventory_register_sale` para descontar stock
+y guardar el precio histórico en una sola transacción. Requiere instalar
+`supabase/sql/ventas.sql` según `supabase/README.md`. La consulta de inventario
+incluye `sales` y `salesEnabled`; una función aún no instalada deshabilita ventas
+sin impedir consultar el inventario existente.
+
 ## Pruebas
 
 Desde la raíz, `npm test` ejecuta los tests de API y servicios sin datos reales.
-Estas pruebas simulan respuestas para comprobar el código; no crean bases
-de datos. `tests/fixtures/inventarioReal.js` proporciona datos de referencia
+Las pruebas de API simulan respuestas para comprobar el código;
+`tests/salesSql.test.js` usa PostgreSQL en memoria con PGlite para comprobar la
+transacción de venta. Ninguna se conecta al proyecto real.
+`tests/fixtures/inventarioReal.js` proporciona datos de referencia
 para esas comprobaciones. La aplicación consulta el proyecto real de Supabase.
 
 `npm run check:connection --workspace backend` comprueba Auth y consultas

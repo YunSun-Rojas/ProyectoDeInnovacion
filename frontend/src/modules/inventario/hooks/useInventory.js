@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadInventory, saveInventoryChange } from '../api/inventoryApi';
 
-const initialState = { products: [], categories: [], movements: [], readOnly: true, status: 'loading', error: '' };
+const initialState = { products: [], categories: [], movements: [], sales: [], salesEnabled: false, readOnly: true, status: 'loading', error: '' };
 
 export function useInventory(userId) {
   const [state, setState] = useState(initialState);
@@ -20,7 +20,14 @@ export function useInventory(userId) {
   useEffect(() => {
     const controller = new AbortController();
     loadInventory(controller.signal).then(data => {
-      if (!controller.signal.aborted) setState({ ...data, status: 'ready', error: '' });
+      if (!controller.signal.aborted) setState({
+        ...initialState,
+        ...data,
+        // Las versiones anteriores de la API todavía no envían ventas.
+        sales: Array.isArray(data.sales) ? data.sales : [],
+        salesEnabled: data.salesEnabled === true && Array.isArray(data.sales),
+        status: 'ready', error: '',
+      });
     }).catch(error => {
       if (!controller.signal.aborted) setState({
         ...initialState,
@@ -53,6 +60,7 @@ export function useInventory(userId) {
           ? [...previous.products.filter(p => p.id !== product.id), product].sort((a, b) => a.id - b.id)
           : previous.products.filter(p => p.id !== request.productId)),
         movements: [movement, ...previous.movements.filter(m => m.id !== movement.id)],
+        sales: result.sale ? [result.sale, ...(previous.sales ?? []).filter(sale => sale.id !== result.sale.id)] : (previous.sales ?? []),
       }));
       pendingRequest.current = null;
       setUncertain(false);
@@ -90,5 +98,6 @@ export function useInventory(userId) {
     onEdit: (product, data) => mutate('edit', product, data),
     onDelete: product => mutate('delete', product),
     onAdjustStock: (product, delta) => mutate('adjust', product, { delta }),
+    onSale: (product, data) => state.salesEnabled ? mutate('sale', product, data) : Promise.resolve(false),
   };
 }

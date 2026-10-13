@@ -1,697 +1,95 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import {
-  DollarSign,
-  Package,
-  AlertTriangle,
-  Layers,
-  ArrowUpRight,
-  ArrowDownRight,
-  TrendingUp,
-  BarChart3,
-  PieChart as PieIcon,
-  Activity,
-  Zap,
-  ShoppingCart,
-  RefreshCw,
-  Clock,
-  ChevronRight,
-} from "lucide-react";
-import {
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-  ComposedChart,
-} from "recharts";
-// ─── Design Tokens ─────────────────────────────────────────────────────────────
-const C = {
-  bg:         "var(--inventory-bg, #F1F5F9)",
-  surface:    "var(--inventory-surface, #FFFFFF)",
-  surfaceAlt: "var(--inventory-surface-alt, #FAFAF8)",
-  ink:        "var(--inventory-ink, #12121A)",
-  inkSecond:  "var(--inventory-ink-second, #454550)",
-  muted:      "var(--inventory-muted, #8A8880)",
-  border:     "var(--inventory-border, #E5E1D8)",
-  borderFaint:"var(--inventory-border-faint, #EFECE6)",
-  accent:     "#D62839",
-  accentTint: "var(--inventory-accent-tint, #FBE6E8)",
-  accentGlow: "rgba(214,40,57,0.12)",
-  success:    "var(--inventory-success, #1E8A4C)",
-  successTint:"var(--inventory-success-tint, #E3F5EB)",
-  warning:    "var(--inventory-warning, #C07D0A)",
-  warningTint:"var(--inventory-warning-tint, #FEF0D3)",
-  danger:     "var(--inventory-danger, #991B2A)",
-  dangerTint: "var(--inventory-danger-tint, #FDEAEC)",
-  info:       "var(--inventory-info, #1A6FAB)",
-  infoTint:   "var(--inventory-info-tint, #E0F0FA)",
-};
+import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowDownLeft, ArrowUpRight, ArrowRight, Package, Wallet, AlertTriangle, PackageX, Clock, CheckCircle2, BarChart3, ShoppingCart, TrendingUp } from 'lucide-react';
+import TopProductsChart from '../components/TopProductsChart';
+import { summarizeInventory, minimumStock, numeric } from './dashboardData';
+import s from './Dashboard.module.css';
+import CategoryDonut from '../components/CategoryDonut';
+import MovementChart from '../components/MovementChart';
+import SalesChart from '../components/SalesChart';
 
-const FONT = { heading: "Oswald, sans-serif", body: "Inter, system-ui, sans-serif" };
+const money = value => new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN', maximumFractionDigits: 2 }).format(value);
+const integer = value => new Intl.NumberFormat('es-PE').format(value);
+const dateTime = value => new Date(value).toLocaleString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-const currency = (v) =>
-  `S/. ${v.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export default function Dashboard({ products = [], activity = { recent: [], series: [], entries: 0, exits: 0, hasFlow: false }, rangeLabel = 'Este mes', salesEnabled = false, salesSummary = { recent: [], series: [], top: [], total: 0, units: 0 }, defaultMinStock = 5, readOnly = true, saving = false, uncertain = false, writeError = '', retryWrite }) {
+  const summary = useMemo(() => summarizeInventory(products, defaultMinStock), [products, defaultMinStock]);
+  const history = activity;
 
-const pct = (a, b) => (b === 0 ? 0 : Math.round(((a - b) / b) * 100));
+  return <div className={s.page}>
+    <header className={s.header}>
+      <div><span className={s.eyebrow}>EAGLE GAMING / INVENTARIO</span><h1>Panel de control</h1><p>Lo que necesitas saber para gestionar tu inventario</p></div>
+    </header>
+    {readOnly && <p className={s.notice}>Modo de consulta. El registro de productos y movimientos está deshabilitado para esta sesión.</p>}
+    {uncertain && <div className={s.notice} role="alert">Hay un guardado pendiente de confirmar. {writeError}<button className={s.button} disabled={saving} onClick={retryWrite}>Reintentar guardado</button></div>}
 
-// Genera historial de valor de inventario mes a mes usando los productos actuales
-// como base y aplicando variación realista hacia atrás en el tiempo
-function buildMonthlyHistory(products) {
-  const months = ["Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep"];
-  const factors = [0.68, 0.74, 0.81, 0.88, 0.93, 0.97, 1.0];
-  const currentValue = products.reduce((s, p) => s + p.stock * p.price, 0);
-  const currentUnits = products.reduce((s, p) => s + p.stock, 0);
-  const currentRevenue = products.reduce((s, p) => s + p.unitsSoldThisMonth * p.price, 0);
+    <div className={s.sectionLabel}><span>RESUMEN DEL INVENTARIO</span><span>Stock actual</span></div>
+    <section className={s.kpis} aria-label="Indicadores actuales">
+      <Stat title="Valor del inventario" value={money(summary.value)} description={`${integer(products.length)} productos registrados`} icon={Wallet} to="/dashboard/productos" />
+      <Stat title="Unidades disponibles" value={integer(summary.units)} description="Existencias totales en almacén" icon={Package} to="/dashboard/productos?estado=disponible" />
+      <Stat title="Stock bajo" value={integer(summary.low)} description="Con existencias, en el mínimo o por debajo" icon={AlertTriangle} tone="warning" to="/dashboard/productos?estado=bajo" />
+      <Stat title="Productos agotados" value={integer(summary.empty)} description="Sin unidades disponibles" icon={PackageX} tone="danger" to="/dashboard/productos?estado=sin-stock" />
+    </section>
 
-  return months.map((mes, i) => ({
-    mes,
-    valorInventario: Math.round(currentValue * factors[i]),
-    unidades:        Math.round(currentUnits * (factors[i] * 0.9 + 0.1)),
-    ingresos:        Math.round(currentRevenue * (factors[i] * 1.15)),
-  }));
-}
+    {products.length > 0 && <div className={s.insights} aria-label="Avisos del inventario">
+      {summary.empty > 0 && <div className={s.dangerInsight}><span aria-hidden="true">🚨</span><span>{summary.empty} producto{summary.empty === 1 ? '' : 's'} sin stock. Reposición inmediata recomendada.</span></div>}
+      {!salesEnabled && <div className={s.warningInsight}><span aria-hidden="true">⚠️</span><span>El registro de ventas está pendiente de habilitación.</span></div>}
+    </div>}
 
-// Calcula días estimados de agotamiento basado en ventas del mes
-function daysUntilStockout(product) {
-  const dailyRate = product.unitsSoldThisMonth / 30;
-  if (dailyRate <= 0) return Infinity;
-  return Math.floor(product.stock / dailyRate);
-}
-
-// Urgencia de reorden: prioridad calculada
-function reorderUrgency(product) {
-  const days = daysUntilStockout(product);
-  const ratio = product.stock / product.minStock;
-  if (product.stock === 0)    return { level: "crítico",  color: C.danger,  bg: C.dangerTint,  days: 0 };
-  if (days <= 7 || ratio < 0.5) return { level: "urgente",  color: C.accent,  bg: C.accentTint,  days };
-  if (days <= 14 || ratio < 1)  return { level: "alerta",   color: C.warning, bg: C.warningTint, days };
-  return                                { level: "ok",       color: C.success, bg: C.successTint, days };
-}
-
-// ─── Custom Tooltip ────────────────────────────────────────────────────────────
-const CustomTooltip = ({ active, payload, label, prefix = "" }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{
-      background: C.ink, borderRadius: 8, padding: "10px 14px",
-      boxShadow: "0 8px 24px rgba(0,0,0,0.18)", fontFamily: FONT.body,
-    }}>
-      <p style={{ color: "#aaa", fontSize: 11, margin: "0 0 6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</p>
-      {payload.map((p, i) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 2, background: p.color, display: "inline-block" }} />
-          <span style={{ color: "#fff", fontSize: 13 }}>{prefix}{p.value?.toLocaleString("es-PE")}</span>
-          <span style={{ color: "#888", fontSize: 11 }}>{p.name}</span>
-        </div>
-      ))}
+    <div className={s.mainGrid}>
+      <section className={s.panel}>
+        <PanelTitle icon={AlertTriangle} title="Productos que requieren atención" subtitle="Agotados primero, seguidos de los productos con menor stock." />
+        {summary.attention.length ? <>
+          <div className={s.tableScroll}><table className={s.table}><thead><tr><th>Producto</th><th>Stock / mínimo</th><th>Estado</th></tr></thead><tbody>
+            {summary.attention.slice(0, 5).map(p => <tr key={p.id}><td><Link className={s.productLink} to={`/dashboard/productos?q=${encodeURIComponent(p.sku)}`}>{p.name}</Link><small>{p.sku}</small></td><td className={s.noWrap}><strong>{integer(p.stock)}</strong><span className={s.muted}> / {integer(minimumStock(p, defaultMinStock))}</span></td><td><span className={p.stock === 0 ? s.dangerBadge : s.warningBadge}>{p.stock === 0 ? 'Agotado' : 'Stock bajo'}</span></td></tr>)}
+          </tbody></table></div>
+          <Link className={s.footerLink} to="/dashboard/productos?estado=alertas">Ver productos que requieren atención ({summary.attention.length}) <ArrowRight size={15} /></Link>
+        </> : <Empty icon={CheckCircle2} title={products.length ? 'Inventario sin alertas' : 'Empieza con tu primer producto'} text={products.length ? 'Todos los productos tienen existencias por encima de su mínimo.' : 'Registra productos para consultar aquí sus niveles de stock.'} />}
+      </section>
+      <section className={s.panel}>
+        <PanelTitle icon={Clock} title="Últimos movimientos" subtitle={`${rangeLabel} · ${integer(history.recent.length)} movimientos`} />
+        {history.recent.length ? <><div className={s.movements}>
+          {history.recent.slice(0, 5).map(m => <article className={s.movement} key={m.id}>
+            <span className={s.movementIcon}>{m.type === 'Entrada' ? <ArrowDownLeft size={17} /> : ['Salida', 'Venta'].includes(m.type) ? <ArrowUpRight size={17} /> : <Package size={17} />}</span>
+            <div className={s.movementBody}><strong>{m.product}</strong><span>{m.type === 'Baja' ? 'Eliminado' : m.type} · {dateTime(m.date)}</span><small title={m.user}>Responsable: {m.user || 'No registrado'}</small>{m.saleId && <small>Venta: {money(m.total)} · {money(m.unitPrice)} por unidad</small>}</div>
+            <div className={s.quantity}><strong>{numeric(m.quantity) > 0 ? '+' : ''}{integer(numeric(m.quantity))}</strong><small>unidades</small></div>
+          </article>)}
+        </div><Link className={s.footerLink} to="/dashboard/historial">Ver historial completo <ArrowRight size={15} /></Link></> : <Empty icon={Clock} title={readOnly ? 'Historial no disponible' : `Sin movimientos · ${rangeLabel.toLowerCase()}`} text={readOnly ? 'El historial estará disponible cuando se habilite el registro de movimientos.' : 'Las operaciones registradas aparecerán aquí con su fecha y responsable.'} />}
+      </section>
     </div>
-  );
-};
 
-// ─── DASHBOARD ─────────────────────────────────────────────────────────────────
-export default function Dashboard({ products = [], categories = [], movements = [], onNavigate }) {
-  const [activeChart, setActiveChart] = useState("valorInventario");
-
-  const cardNavigation = (page) => ({
-    role: "link",
-    tabIndex: 0,
-    onClick: event => { if (!event.target.closest('a, button, input, select')) onNavigate(page); },
-    onKeyDown: event => {
-      if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
-        event.preventDefault();
-        onNavigate(page);
-      }
-    },
-  });
-
-  // ── Métricas derivadas ────────────────────────────────────────────────────────
-  const metrics = useMemo(() => {
-    const totalStock      = products.reduce((s, p) => s + p.stock, 0);
-    const totalValue      = products.reduce((s, p) => s + p.stock * p.price, 0);
-    const totalSoldMonth  = products.reduce((s, p) => s + p.unitsSoldThisMonth, 0);
-    const totalSoldLast   = products.reduce((s, p) => s + p.unitsSoldLastMonth, 0);
-    const revenueMonth    = products.reduce((s, p) => s + p.unitsSoldThisMonth * p.price, 0);
-    const revenueLast     = products.reduce((s, p) => s + p.unitsSoldLastMonth * p.price, 0);
-    const lowStockItems   = products.filter(p => p.stock <= p.minStock);
-    const criticalItems   = products.filter(p => p.stock === 0);
-    const turnoverRate    = totalValue > 0 ? ((revenueMonth / totalValue) * 100).toFixed(1) : 0;
-    const avgPrice        = products.length ? (products.reduce((s, p) => s + p.price, 0) / products.length).toFixed(0) : 0;
-
-    // Velocidad de rotación por categoría (ventas / stock promedio)
-    const categoryMetrics = categories.map(cat => {
-      const catProducts = products.filter(p => p.category === cat.name);
-      const catStock    = catProducts.reduce((s, p) => s + p.stock, 0);
-      const catSold     = catProducts.reduce((s, p) => s + p.unitsSoldThisMonth, 0);
-      return {
-        name:     cat.name,
-        productos: catProducts.length,
-        stock:    catStock,
-        vendidos: catSold,
-        rotacion: catStock > 0 ? ((catSold / catStock) * 100).toFixed(1) : 0,
-      };
-    }).filter(c => c.productos > 0)
-      .sort((a, b) => parseFloat(b.rotacion) - parseFloat(a.rotacion));
-
-    // Estado de salud del inventario
-    const stockHealth = [
-      { name: "Óptimo",    value: products.filter(p => p.stock > p.minStock * 1.5).length,                     color: C.success },
-      { name: "Normal",    value: products.filter(p => p.stock > p.minStock && p.stock <= p.minStock * 1.5).length, color: C.info },
-      { name: "Bajo",      value: products.filter(p => p.stock > 0 && p.stock <= p.minStock).length,           color: C.warning },
-      { name: "Agotado",   value: products.filter(p => p.stock === 0).length,                                   color: C.danger },
-    ].filter(s => s.value > 0);
-
-    // Top 5 más vendidos este mes
-    const topBySales = [...products].filter(p => p.unitsSoldThisMonth > 0)
-      .sort((a, b) => b.unitsSoldThisMonth - a.unitsSoldThisMonth)
-      .slice(0, 5)
-      .map(p => ({ sku: p.sku, name: p.name.length > 22 ? p.name.slice(0, 22) + "…" : p.name, unidades: p.unitsSoldThisMonth, ingresos: p.unitsSoldThisMonth * p.price }));
-
-    // Productos que necesitan reorden, ordenados por urgencia
-    const reorderList = products
-      .map(p => ({ ...p, urgency: reorderUrgency(p) }))
-      .filter(p => p.urgency.level !== "ok")
-      .sort((a, b) => a.urgency.days - b.urgency.days)
-      .slice(0, 7);
-
-    // Insights automáticos
-    const insights = [];
-    if (criticalItems.length > 0)
-      insights.push({ icon: "🚨", text: `${criticalItems.length} producto${criticalItems.length > 1 ? "s" : ""} sin stock. Reposición inmediata recomendada.`, type: "danger" });
-    if (pct(revenueMonth, revenueLast) > 0)
-      insights.push({ icon: "📈", text: `Los ingresos crecieron ${pct(revenueMonth, revenueLast)}% vs. el mes anterior.`, type: "success" });
-    if (parseFloat(turnoverRate) < 15)
-      insights.push({ icon: "⚠️", text: `La tasa de rotación (${turnoverRate}%) está por debajo del umbral óptimo (15%).`, type: "warning" });
-    const fastMover = topBySales[0];
-    if (fastMover)
-      insights.push({ icon: "⚡", text: `"${fastMover.name}" es el producto más vendido este mes con ${fastMover.unidades} unidades.`, type: "info" });
-
-    return {
-      totalStock, totalValue, totalSoldMonth,
-      revenueMonth, lowStockItems, criticalItems,
-      turnoverRate, avgPrice, categoryMetrics, stockHealth,
-      topBySales, reorderList, insights,
-      pctRevenue: pct(revenueMonth, revenueLast),
-      pctSold:    pct(totalSoldMonth, totalSoldLast),
-    };
-  }, [products, categories]);
-
-  const monthlyData = useMemo(() => buildMonthlyHistory(products), [products]);
-
-  // ── Render ────────────────────────────────────────────────────────────────────
-  return (
-    <div className="dashboard-page" style={{ padding: "28px 36px 48px", background: C.bg, minHeight: "100vh", boxSizing: "border-box" }}>
-
-      {/* ── Encabezado ── */}
-      <div className="dashboard-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28 }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-            <div style={{ width: 4, height: 28, borderRadius: 2, background: "#E32636" }} />
-            <h1 style={{ margin: 0, fontFamily: FONT.heading, fontSize: 30, fontWeight: 700, color: C.ink, letterSpacing: "0.5px" }}>
-              Panel de Control
-            </h1>
-          </div>
-          <p style={{ margin: 0, fontFamily: FONT.body, fontSize: 13, color: C.muted, paddingLeft: 14 }}>
-            Sistema de Gestión de Inventario Inteligente · Eagle Gaming
-          </p>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.successTint, border: `1px solid color-mix(in srgb, ${C.success} 19%, transparent)`, borderRadius: 20, padding: "6px 14px" }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.success, boxShadow: `0 0 0 3px color-mix(in srgb, ${C.success} 19%, transparent)` }} />
-          <span style={{ fontFamily: FONT.body, fontSize: 12, fontWeight: 600, color: C.success }}>Sistema Activo</span>
-        </div>
-      </div>
-
-      {/* ── KPIs Row 1 (4 cards) ── */}
-      <div className="dashboard-kpis" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16, marginBottom: 16 }}>
-        <KpiCard
-          to="/dashboard/productos"
-          title="Valor Total Inventario"
-          value={currency(metrics.totalValue)}
-          sub={`${products.length} SKUs activos`}
-          trend={"Valor del stock actual"}
-          isPositive icon={DollarSign}
-          accent="#E32636"
-        />
-        <KpiCard
-          to="/dashboard/productos?estado=disponible"
-          title="Unidades en Stock"
-          value={metrics.totalStock.toLocaleString("es-PE")}
-          sub={`Promedio S/. ${metrics.avgPrice} por ítem`}
-          trend={`+${metrics.pctSold}% ventas este mes`}
-          isPositive icon={Package}
-        />
-        <KpiCard
-          to="/dashboard/productos?estado=vendidos"
-          title="Ingresos por Ventas"
-          value={currency(metrics.revenueMonth)}
-          sub={`${metrics.totalSoldMonth} unidades vendidas`}
-          trend={`${metrics.pctRevenue >= 0 ? "+" : ""}${metrics.pctRevenue}% vs mes anterior`}
-          isPositive={metrics.pctRevenue >= 0}
-          icon={ShoppingCart}
-          accent={metrics.pctRevenue >= 0 ? C.ink : C.danger}
-        />
-        <KpiCard
-          to="/dashboard/productos?estado=alertas"
-          title="Alertas Activas"
-          value={metrics.lowStockItems.length}
-          sub={`${metrics.criticalItems.length} productos agotados`}
-          trend={metrics.lowStockItems.length === 0 ? "Stock óptimo" : "Requiere atención"}
-          isPositive={metrics.lowStockItems.length === 0}
-          icon={AlertTriangle}
-          accent={metrics.lowStockItems.length > 0 ? C.danger : C.ink}
-          urgent={metrics.lowStockItems.length > 0}
-        />
-      </div>
-
-      {/* ── KPIs Row 2 (2 secundarios) ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 440px), 1fr))", gap: 16, marginBottom: 24 }}>
-        <MiniStatCard
-          to="/dashboard/productos"
-          title="Tasa de Rotación de Inventario"
-          value={`${metrics.turnoverRate}%`}
-          desc="Ingresos / Valor inventario (mensual)"
-          icon={RefreshCw}
-          color={parseFloat(metrics.turnoverRate) >= 15 ? C.success : C.warning}
-          hint={parseFloat(metrics.turnoverRate) >= 15 ? "Rotación saludable" : "Por debajo del umbral óptimo (15%)"}
-        />
-        <MiniStatCard
-          to="/dashboard/productos"
-          title="Categorías Gestionadas"
-          value={categories.length}
-          desc={`${categories.length} familias de productos activas`}
-          icon={Layers}
-          color={C.info}
-          hint={`${metrics.categoryMetrics.length} categorías con productos`}
-        />
-      </div>
-
-      {/* ── Insights Automáticos ── */}
-      {metrics.insights.length > 0 && (
-        <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
-          {metrics.insights.map((ins, i) => (
-            <InsightPill key={i} {...ins} />
-          ))}
-        </div>
-      )}
-
-      {/* ── Fila de 4 gráficos del mismo peso ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 20, marginBottom: 20 }}>
-
-        {/* Gráfico: Evolución mensual (área interactiva) */}
-        <div {...cardNavigation("historial")} style={{ cursor: "pointer", minWidth: 0, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-            <ChartHeader icon={TrendingUp} title="Evolución Mensual" sub="Simulación de 7 meses" to="/dashboard/historial" />
-            <div style={{ display: "flex", gap: 4 }}>
-              {[
-                { key: "valorInventario", label: "S/.", color: C.accent },
-                { key: "ingresos",        label: "Vtas", color: C.success },
-                { key: "unidades",        label: "Uds", color: C.info },
-              ].map(btn => (
-                <button
-                  key={btn.key}
-                  onClick={() => setActiveChart(btn.key)}
-                  style={{
-                    padding: "3px 7px", borderRadius: 12,
-                    border: `1px solid ${activeChart === btn.key ? btn.color : C.border}`,
-                    background: activeChart === btn.key ? btn.color + "18" : C.surfaceAlt,
-                    color: activeChart === btn.key ? btn.color : C.muted,
-                    fontFamily: FONT.body, fontSize: 10, fontWeight: 600, cursor: "pointer",
-                  }}
-                >
-                  {btn.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div style={{ height: 180 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={monthlyData} margin={{ top: 6, right: 6, left: -18, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="gradAccent" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor={C.accent}  stopOpacity={0.22} />
-                    <stop offset="95%" stopColor={C.accent}  stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gradSuccess" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor={C.success} stopOpacity={0.18} />
-                    <stop offset="95%" stopColor={C.success} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gradInfo" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor={C.info}    stopOpacity={0.15} />
-                    <stop offset="95%" stopColor={C.info}    stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke={C.borderFaint} />
-                <XAxis dataKey="mes" stroke={C.muted} fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke={C.muted} fontSize={10} tickLine={false} axisLine={false}
-                  tickFormatter={v => activeChart === "unidades" ? v : `${(v/1000).toFixed(0)}k`} />
-                <Tooltip content={<CustomTooltip prefix={activeChart === "unidades" ? "" : "S/. "} />} />
-                {activeChart === "valorInventario" && (
-                  <Area type="monotone" dataKey="valorInventario" name="Valor Inv." stroke={C.accent} strokeWidth={2} fill="url(#gradAccent)" dot={{ r: 3, fill: C.accent, strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                )}
-                {activeChart === "ingresos" && (
-                  <Area type="monotone" dataKey="ingresos" name="Ventas" stroke={C.success} strokeWidth={2} fill="url(#gradSuccess)" dot={{ r: 3, fill: C.success, strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                )}
-                {activeChart === "unidades" && (
-                  <Area type="monotone" dataKey="unidades" name="Unidades" stroke={C.info} strokeWidth={2} fill="url(#gradInfo)" dot={{ r: 3, fill: C.info, strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                )}
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Gráfico: Stock + Ventas por Categoría (Barras agrupadas) */}
-        <div {...cardNavigation("productos")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
-          <ChartHeader icon={BarChart3} title="Stock vs. Ventas por Categoría" sub="Comparativa mensual por familia de productos" to="/dashboard/productos" />
-          <div style={{ height: 200 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={metrics.categoryMetrics} margin={{ top: 8, right: 8, left: -22, bottom: 0 }} barGap={2}>
-                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke={C.borderFaint} />
-                <XAxis dataKey="name" stroke={C.muted} fontSize={9} tickLine={false} axisLine={false}
-                  tickFormatter={v => v.length > 7 ? v.slice(0, 7) + "…" : v} />
-                <YAxis stroke={C.muted} fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                <Bar dataKey="stock"    name="Stock"   fill={C.ink}     radius={[3, 3, 0, 0]} barSize={14} />
-                <Bar dataKey="vendidos" name="Vendidos" fill={C.accent} radius={[3, 3, 0, 0]} barSize={14} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Gráfico: Donut estado del inventario */}
-        <div {...cardNavigation("productos?estado=alertas")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
-          <ChartHeader icon={PieIcon} title="Estado de Salud" sub="Distribución de disponibilidad" to="/dashboard/productos?estado=alertas" />
-          <div style={{ height: 140, marginTop: 4 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={metrics.stockHealth}
-                  cx="50%" cy="50%"
-                  innerRadius={42} outerRadius={62}
-                  paddingAngle={3}
-                  dataKey="value"
-                  strokeWidth={0}
-                >
-                  {metrics.stockHealth.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          {/* Leyenda personalizada */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: 8, justifyContent: "center" }}>
-            {metrics.stockHealth.map(s => (
-              <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.inkSecond }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, display: "inline-block" }} />
-                <span style={{ fontWeight: 600 }}>{s.value}</span>
-                <span style={{ color: C.muted }}>{s.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Gráfico: Rotación por Categoría (Barras horizontales) */}
-        <div {...cardNavigation("productos")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px", display: "flex", flexDirection: "column" }}>
-          <ChartHeader icon={Activity} title="Tasa de Rotación" sub="Ventas / Stock disponible (%)" to="/dashboard/productos" />
-          <div style={{ marginTop: 12, flex: 1, maxHeight: 200, overflowY: "auto", paddingRight: 6, display: "flex", flexDirection: "column", gap: 8 }}>
-            {metrics.categoryMetrics.map(cat => (
-                <RotationBar
-                  key={cat.name}
-                  name={cat.name}
-                  value={parseFloat(cat.rotacion)}
-                  max={Math.max(...metrics.categoryMetrics.map(c => parseFloat(c.rotacion)))}
-                />
-              ))}
-          </div>
-        </div>
-
-      </div>
-
-      {/* ── Fila inferior: Top productos + Tabla de reorden ── */}
-      <div className="dashboard-bottom" style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 20 }}>
-
-        {/* Top 5 Más Vendidos */}
-        <div {...cardNavigation("productos?estado=vendidos")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
-          <ChartHeader icon={Zap} title="Top Productos · Ventas" sub="Unidades vendidas este mes" to="/dashboard/productos?estado=vendidos" />
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
-            {metrics.topBySales.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>Aún no hay ventas registradas este mes.</p>}
-            {metrics.topBySales.map((p, i) => (
-              <TopProductRow to={`/dashboard/productos?q=${encodeURIComponent(p.sku)}`} key={i} rank={i + 1} name={p.name} value={p.unidades} suffix="uds." secondValue={currency(p.ingresos)} />
-            ))}
-          </div>
-        </div>
-
-        {/* Tabla de Reorden Prioritaria */}
-        <div {...cardNavigation("productos?estado=alertas")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <div>
-              <h3 style={{ margin: 0, fontFamily: FONT.body, fontSize: 14, fontWeight: 700, color: C.ink, display: "flex", alignItems: "center", gap: 6 }}>
-                <AlertTriangle size={15} color={C.accent} />
-                Productos que Requieren Atención
-              </h3>
-              <p style={{ margin: "2px 0 0", fontSize: 12, color: C.muted }}>Ordenados por urgencia de reposición</p>
-            </div>
-            <button
-              onClick={() => onNavigate("productos?estado=alertas")}
-              style={{
-                display: "flex", alignItems: "center", gap: 4,
-                border: `1px solid ${C.border}`, background: C.surfaceAlt,
-                color: C.accent, fontFamily: FONT.body, fontSize: 12,
-                fontWeight: 600, cursor: "pointer", borderRadius: 8, padding: "6px 12px",
-              }}
-            >
-              Ver inventario <ChevronRight size={13} />
-            </button>
-          </div>
-
-          {metrics.reorderList.length === 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 0", gap: 10 }}>
-              <div style={{ width: 44, height: 44, borderRadius: "50%", background: C.successTint, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontSize: 22 }}>✅</span>
-              </div>
-              <p style={{ color: C.success, fontSize: 13, fontWeight: 600, margin: 0 }}>Todo el inventario está en niveles óptimos</p>
-            </div>
-          ) : (
-            <div style={{ overflowX: "auto" }}><table style={{ width: "100%", minWidth: 420, borderCollapse: "collapse", fontFamily: FONT.body }}>
-              <thead>
-                <tr style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                  <th style={{ textAlign: "left", paddingBottom: 8, fontWeight: 600 }}>Producto</th>
-                  <th style={{ textAlign: "center", paddingBottom: 8, fontWeight: 600 }}>Stock</th>
-                  <th style={{ textAlign: "center", paddingBottom: 8, fontWeight: 600 }}>Días est.</th>
-                  <th style={{ textAlign: "left",  paddingBottom: 8, fontWeight: 600 }}>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {metrics.reorderList.map(p => {
-                  const u = p.urgency;
-                  return (
-                    <tr key={p.id} style={{ borderTop: `1px solid ${C.borderFaint}`, fontSize: 12 }}>
-                      <td style={{ padding: "9px 0" }}>
-                        <div style={{ fontWeight: 600, color: C.ink, lineHeight: 1.2 }}>
-                          <Link to={`/dashboard/productos?q=${encodeURIComponent(p.sku)}`} style={{ color: "inherit" }}>{p.name.length > 28 ? p.name.slice(0, 28) + "…" : p.name}</Link>
-                        </div>
-                        <div style={{ color: C.muted, fontSize: 11 }}>{p.sku}</div>
-                      </td>
-                      <td style={{ textAlign: "center", color: C.ink, fontWeight: 700 }}>
-                        {p.stock}
-                        <span style={{ color: C.muted, fontWeight: 400, fontSize: 11 }}> / {p.minStock}</span>
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        {p.stock === 0
-                          ? <span style={{ color: C.danger, fontWeight: 700, fontSize: 12 }}>—</span>
-                          : <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3, color: u.color, fontWeight: 700 }}>
-                              <Clock size={11} />{Number.isFinite(u.days) ? `${u.days}d` : "Sin datos de ventas"}
-                            </span>
-                        }
-                      </td>
-                      <td style={{ padding: "9px 0 9px 8px" }}>
-                        <span style={{
-                          padding: "3px 9px", borderRadius: 12, fontSize: 10, fontWeight: 700,
-                          background: u.bg, color: u.color, textTransform: "uppercase", letterSpacing: "0.3px",
-                        }}>
-                          {u.level}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table></div>
-          )}
-        </div>
-
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 20, marginTop: 20 }}>
-        <section {...cardNavigation("historial")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
-          <ChartHeader icon={Clock} title="Últimos movimientos" sub={`${movements.length} movimientos registrados en esta sesión`} to="/dashboard/historial" />
-          {movements.length === 0 ? <p style={{ color: C.muted, fontSize: 12 }}>Todavía no hay movimientos. Los cambios de Inventario aparecerán aquí.</p> : movements.slice(0, 3).map(m => <p key={m.id} style={{ fontSize: 12, color: C.inkSecond }}><strong>{m.type}</strong> · {m.product} · {m.before} → {m.after}</p>)}
-        </section>
-        <section {...cardNavigation("prediccion")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
-          <ChartHeader icon={TrendingUp} title="Predicción IA" sub="Simulación disponible" to="/dashboard/prediccion" />
-          <p style={{ color: C.muted, fontSize: 12 }}>Consulta la demostración de estimaciones para los productos del inventario.</p>
-        </section>
-        <section {...cardNavigation("vision")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px" }}>
-          <ChartHeader icon={Package} title="Reconocimiento Visión" sub="Simulación disponible" to="/dashboard/vision" />
-          <p style={{ color: C.muted, fontSize: 12 }}>Abre la demostración de reconocimiento. Todavía no registra ingresos al stock.</p>
-        </section>
-      </div>
-
+    <div className={s.charts}>
+      <section className={s.panel}>
+        <PanelTitle icon={BarChart3} title="Entradas y salidas" subtitle={`Unidades por día · ${rangeLabel.toLowerCase()}`} />
+        <div className={s.flowTotals}><span><i className={s.entryDot} /> Entradas <strong>{integer(history.entries)}</strong></span><span><i className={s.exitDot} /> Salidas <strong>{integer(history.exits)}</strong></span></div>
+        {history.hasFlow ? <MovementChart activity={history} /> : <Empty icon={BarChart3} title={readOnly ? 'Historial no disponible' : `Sin entradas o salidas · ${rangeLabel.toLowerCase()}`} text="Sin movimientos registrados" />}
+        <p className={s.chartNote}>Registro de movimientos que modifican las existencias del inventario</p>
+      </section>
+      <section className={s.panel}>
+        <PanelTitle icon={Wallet} title="Valor por categoría" subtitle="Valor del stock actual" />
+        {summary.value > 0 ? <CategoryDonut categories={summary.categories} total={summary.value} /> : <Empty icon={Package} title="Sin valor de inventario para mostrar" text="El gráfico aparecerá cuando haya productos con existencias y precio registrado." />}
+        <p className={s.chartNote}>Stock × precio registrado de cada producto</p>
+      </section>
+      <section className={s.panel}>
+        <PanelTitle icon={TrendingUp} title="Monto vendido por día" subtitle={rangeLabel} />
+        <div className={s.salesTotal}><span>Total vendido</span><strong>{salesEnabled ? money(salesSummary.total) : '—'}</strong></div>
+        {salesEnabled && salesSummary.recent.length > 0 ? <SalesChart summary={salesSummary} /> : <Empty icon={TrendingUp} title={salesEnabled ? 'Sin ventas registradas en este período' : 'Ventas pendientes de habilitación'} text="Solo se incluyen operaciones registradas como venta, con su precio aplicado." />}
+        <p className={s.chartNote}>Los cambios posteriores de precio no modifican estos importes.</p>
+      </section>
+      <section className={s.panel}>
+        <PanelTitle icon={ShoppingCart} title="Productos más vendidos" subtitle={`Cinco productos por unidades vendidas · ${rangeLabel.toLowerCase()}`} />
+        {salesEnabled && salesSummary.top.length > 0 ? <TopProductsChart products={salesSummary.top} /> : <Empty icon={ShoppingCart} title={salesEnabled ? 'Aún no hay productos vendidos en este período' : 'Ventas pendientes de habilitación'} text="Las salidas por ajustes o bajas no se cuentan como ventas." />}
+      </section>
     </div>
-  );
+  </div>;
 }
 
-// ─── Sub-componentes ───────────────────────────────────────────────────────────
-
-function KpiCard({ to, title, value, sub, trend, isPositive, icon: Icon, accent, urgent }) {
-  return (
-    <Link to={to} style={{ minWidth: 0, textDecoration: "none", color: "inherit",
-      background: C.surface,
-      border: `1px solid ${urgent ? C.accent + "55" : C.border}`,
-      borderRadius: 14,
-      padding: "18px 20px",
-      display: "flex",
-      flexDirection: "column",
-      gap: 10,
-      position: "relative",
-      overflow: "hidden",
-      boxShadow: urgent ? `0 0 0 3px ${C.accentGlow}` : "none",
-    }}>
-      {/* Decorative top bar */}
-      {urgent && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: C.accent, borderRadius: "14px 14px 0 0" }} />}
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontFamily: FONT.body, fontSize: 12, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-          {title}
-        </span>
-        <div style={{ width: 32, height: 32, borderRadius: 8, background: (accent || C.ink) + "12", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {Icon && <Icon size={16} color={accent || C.ink} />}
-        </div>
-      </div>
-
-      <div>
-        <div style={{ fontFamily: FONT.heading, fontSize: "clamp(22px, 2vw, 28px)", overflowWrap: "anywhere", fontWeight: 700, color: accent || C.ink, lineHeight: 1.1 }}>
-          {value}
-        </div>
-        <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{sub}</div>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600 }}>
-        {isPositive
-          ? <ArrowUpRight size={13} color={C.success} />
-          : <ArrowDownRight size={13} color={C.danger} />}
-        <span style={{ color: isPositive ? C.success : C.danger }}>{trend}</span>
-      </div>
-    </Link>
-  );
+function Stat({ title, value, description, icon: Icon, tone = 'neutral', to }) {
+  return <Link to={to} className={`${s.stat} ${s[tone] || ''}`}><div className={s.statTop}><span>{title}</span><Icon size={19} /></div><strong className={s.statValue}>{value}</strong><span className={s.statDescription}>{description}</span></Link>;
 }
-
-function MiniStatCard({ to, title, value, desc, icon: Icon, color, hint }) {
-  return (
-    <Link className="dashboard-mini" to={to} style={{ minWidth: 0, textDecoration: "none", color: "inherit",
-      background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14,
-      padding: "16px 20px", display: "flex", alignItems: "center", gap: 16,
-    }}>
-      <div style={{ width: 48, height: 48, borderRadius: 12, background: color + "18", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <Icon size={22} color={color} />
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>{title}</div>
-        <div style={{ fontFamily: FONT.heading, fontSize: 26, fontWeight: 700, color: C.ink, lineHeight: 1 }}>{value}</div>
-        <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{desc}</div>
-      </div>
-      <div style={{ background: color + "14", border: `1px solid ${color}30`, borderRadius: 8, padding: "6px 10px", fontSize: 11, color, fontWeight: 600, maxWidth: 160, textAlign: "center" }}>
-        {hint}
-      </div>
-    </Link>
-  );
+function PanelTitle({ icon: Icon, title, subtitle }) {
+  return <header className={s.panelTitle}><div><Icon size={17} /><h2>{title}</h2></div><p>{subtitle}</p></header>;
 }
-
-function InsightPill({ icon, text, type }) {
-  const colors = {
-    danger:  { bg: C.dangerTint,  border: `color-mix(in srgb, ${C.danger} 27%, transparent)`, text: C.danger },
-    success: { bg: C.successTint, border: `color-mix(in srgb, ${C.success} 27%, transparent)`, text: C.success },
-    warning: { bg: C.warningTint, border: `color-mix(in srgb, ${C.warning} 27%, transparent)`, text: C.warning },
-    info:    { bg: C.infoTint,    border: `color-mix(in srgb, ${C.info} 27%, transparent)`, text: C.info },
-  };
-  const s = colors[type] || colors.info;
-  return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 8,
-      background: s.bg, border: `1px solid ${s.border}`,
-      borderRadius: 20, padding: "6px 14px",
-      fontFamily: FONT.body, fontSize: 12, color: s.text, fontWeight: 500,
-    }}>
-      <span>{icon}</span>
-      <span>{text}</span>
-    </div>
-  );
-}
-
-function ChartHeader({ icon: Icon, title, sub, to }) {
-  return (
-    <div style={{ marginBottom: 4 }}>
-      <h3 style={{ margin: 0, fontFamily: FONT.body, fontSize: 14, fontWeight: 700, color: C.ink, display: "flex", alignItems: "center", gap: 6 }}>
-        <Icon size={14} color={C.accent} />
-        {to ? <Link to={to} style={{ color: "inherit", textDecoration: "none" }} title="Abrir detalle">{title} <ChevronRight size={12} style={{ display: "inline" }} /></Link> : title}
-      </h3>
-      {sub && <p style={{ margin: "2px 0 0", fontSize: 11, color: C.muted }}>{sub}</p>}
-    </div>
-  );
-}
-
-function RotationBar({ name, value, max }) {
-  const pctWidth = max > 0 ? (value / max) * 100 : 0;
-  const color = value >= 50 ? C.success : value >= 25 ? C.warning : C.danger;
-  const shortName = name.length > 14 ? name.slice(0, 14) + "…" : name;
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-        <Link to={`/dashboard/productos?categoria=${encodeURIComponent(name)}`} style={{ fontFamily: FONT.body, fontSize: 12, color: C.inkSecond, fontWeight: 500, textDecoration: "none" }}>{shortName}</Link>
-        <span style={{ fontFamily: FONT.body, fontSize: 12, fontWeight: 700, color }}>{value}%</span>
-      </div>
-      <div style={{ height: 5, background: C.borderFaint, borderRadius: 3, overflow: "hidden" }}>
-        <div style={{
-          height: "100%", width: `${pctWidth}%`, background: color,
-          borderRadius: 3, transition: "width 0.6s ease",
-        }} />
-      </div>
-    </div>
-  );
-}
-
-function TopProductRow({ to, rank, name, value, suffix, secondValue }) {
-  const rankColors = ["#D62839", "#C07D0A", "#1A6FAB", "#454550", "#454550"];
-  return (
-    <Link to={to} style={{ minWidth: 0, textDecoration: "none", color: "inherit",
-      display: "flex", alignItems: "center", gap: 10,
-      padding: "8px 10px", borderRadius: 8,
-      background: rank === 1 ? C.accentTint : C.surfaceAlt,
-      border: `1px solid ${rank === 1 ? C.accent + "30" : C.borderFaint}`,
-    }}>
-      <span style={{
-        width: 22, height: 22, borderRadius: 6,
-        background: rankColors[rank - 1] || C.muted, color: "#fff",
-        fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
-        flexShrink: 0,
-      }}>{rank}</span>
-      <span style={{ flex: 1, fontSize: 12, fontWeight: rank === 1 ? 700 : 500, color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {name}
-      </span>
-      <div style={{ textAlign: "right", flexShrink: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{value} <span style={{ fontSize: 10, color: C.muted, fontWeight: 400 }}>{suffix}</span></div>
-        <div style={{ fontSize: 10, color: C.muted }}>{secondValue}</div>
-      </div>
-    </Link>
-  );
+function Empty({ icon: Icon, title, text }) {
+  return <div className={s.empty}><Icon size={28} /><strong>{title}</strong><p>{text}</p></div>;
 }
