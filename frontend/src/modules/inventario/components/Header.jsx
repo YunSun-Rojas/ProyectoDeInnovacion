@@ -35,7 +35,13 @@ const FONT = { body: "Inter, system-ui, sans-serif" };
 const currency = (v) =>
   `S/. ${v.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const DATE_RANGES = ["Hoy", "Últimos 7 días", "Últimos 30 días", "Este mes", "Trimestre actual"];
+const DATE_RANGES = [
+  { label: "Hoy", shortLabel: "hoy", multiplier: 1 / 30 },
+  { label: "Últimos 7 días", shortLabel: "7d", multiplier: 7 / 30 },
+  { label: "Últimos 30 días", shortLabel: "30d", multiplier: 1 },
+  { label: "Este mes", shortLabel: "mes", multiplier: 1 },
+  { label: "Trimestre actual", shortLabel: "trim", multiplier: 3 },
+];
 
 function useClickOutside(ref, handler) {
   useEffect(() => {
@@ -59,6 +65,7 @@ export default function Header({ products = [], inventoryReady = true }) {
 
   const notifRef   = useRef(null);
   const dateRef    = useRef(null);
+  const selectedRangeConfig = DATE_RANGES.find(({ label }) => label === selectedRange) ?? DATE_RANGES[2];
 
   useClickOutside(notifRef, () => setShowNotifications(false));
   useClickOutside(dateRef,  () => setShowDatePicker(false));
@@ -70,7 +77,7 @@ export default function Header({ products = [], inventoryReady = true }) {
 
   // KPI rápido para el header
   const totalValue  = products.reduce((s, p) => s + p.stock * p.price, 0);
-  const totalSold   = products.reduce((s, p) => s + (p.unitsSoldThisMonth ?? 0), 0);
+  const totalSoldInRange = products.reduce((s, p) => s + ((p.unitsSoldThisMonth ?? 0) * selectedRangeConfig.multiplier), 0);
 
   // Exportar CSV enriquecido
   const handleExportCSV = () => {
@@ -106,7 +113,7 @@ export default function Header({ products = [], inventoryReady = true }) {
       const url  = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `Reporte_Inventario_EagleGaming_${new Date().toISOString().slice(0, 10)}.csv`;
+      link.download = `Reporte_Inventario_EagleGaming_${selectedRangeConfig.shortLabel}_${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -139,7 +146,7 @@ export default function Header({ products = [], inventoryReady = true }) {
         {/* Resumen numérico compacto */}
         <div className="header-stats" style={{ display: "flex", gap: 20, borderRight: `1px solid ${C.borderFaint}`, paddingRight: 20 }}>
           <QuickStat label="Valor inv." value={inventoryReady ? currency(totalValue) : '—'} />
-          <QuickStat label="Vendidos / mes" value={inventoryReady ? `${totalSold} uds.` : '—'} />
+          <QuickStat label={selectedRangeConfig.label === "Este mes" ? "Vendidos / mes" : `Vendidos / ${selectedRangeConfig.shortLabel}`} value={inventoryReady ? `${Math.round(totalSoldInRange)} uds.` : '—'} />
         </div>
 
         {/* Selector de rango de fechas */}
@@ -168,18 +175,18 @@ export default function Header({ products = [], inventoryReady = true }) {
             }}>
               {DATE_RANGES.map(r => (
                 <button
-                  key={r}
-                  onClick={() => { setSelectedRange(r); setShowDatePicker(false); }}
+                  key={r.label}
+                  onClick={() => { setSelectedRange(r.label); setShowDatePicker(false); }}
                   style={{
                     display: "block", width: "100%", textAlign: "left",
                     padding: "8px 12px", borderRadius: 7, border: "none",
-                    background: r === selectedRange ? C.accentTint : "transparent",
-                    color: r === selectedRange ? C.accent : C.inkSecond,
-                    fontFamily: FONT.body, fontSize: 13, fontWeight: r === selectedRange ? 600 : 400,
+                    background: r.label === selectedRange ? C.accentTint : "transparent",
+                    color: r.label === selectedRange ? C.accent : C.inkSecond,
+                    fontFamily: FONT.body, fontSize: 13, fontWeight: r.label === selectedRange ? 600 : 400,
                     cursor: "pointer",
                   }}
                 >
-                  {r}
+                  {r.label}
                 </button>
               ))}
             </div>
