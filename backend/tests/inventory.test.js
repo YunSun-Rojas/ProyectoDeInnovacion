@@ -46,7 +46,10 @@ function server({ member = true, rows = products, categoryRows = categories, cap
 test('conserva los 173 productos, categorías y totales del inventario importado', async () => {
   const { client, requests } = server();
   const result = await loadInventory(client, userId);
-  assert.deepEqual(result.products, productosDashboard);
+  assert.deepEqual(result.products.map((product, index) => Object.fromEntries(Object.keys(productosDashboard[index]).map(key => [key, product[key]]))), productosDashboard);
+  assert.equal(result.products[0].purchaseCost, null);
+  assert.equal(result.products[0].unitOfMeasure, 'Unidad');
+  assert(requests.find(request => request.table === 'products').query.get('select').includes('purchase_cost'));
   assert.deepEqual(result.categories, categoriasDashboard);
   assert.equal(result.products.reduce((sum, p) => sum + p.stock, 0), 1169);
   assert.equal(result.products.reduce((sum, p) => sum + p.stock * p.price, 0), 618895);

@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import SaleDialog from "../components/SaleDialog";
+import ProductDetailsDialog from "../components/catalog/ProductDetailsDialog";
+import ProductForm from "../components/catalog/ProductForm";
+import catalogStyles from "../components/catalog/ProductCatalog.module.css";
 
 import {
   Search,
+  Eye,
   Plus,
   Pencil,
   Trash2,
@@ -14,7 +18,6 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
-  UserRound,
 } from "lucide-react";
 
 // ─── Utilidades ─────────────────────────────────────────────
@@ -62,16 +65,6 @@ function summarize(products) {
   );
 }
 
-function getUserName(user) {
-  return (
-    user?.user_metadata?.full_name ||
-    user?.user_metadata?.name ||
-    user?.name ||
-    user?.email ||
-    ""
-  );
-}
-
 function defaultAuthor(product) {
   return (
     product.createdByName ||
@@ -93,49 +86,6 @@ function csvCell(value) {
   return `"${text.replaceAll('"', '""')}"`;
 }
 
-function validateProduct(form, products, editingId) {
-  if (!form.name.trim() || !form.sku.trim() || !form.category) {
-    return "Completa el nombre, SKU y categoría.";
-  }
-
-  const duplicate = products.some(
-    (product) =>
-      product.id !== editingId &&
-      String(product.sku ?? "").trim().toLowerCase() ===
-        form.sku.trim().toLowerCase()
-  );
-
-  if (duplicate) return "Ya existe un producto con este SKU.";
-
-  for (const key of ["stock", "minStock"]) {
-    const value = Number(form[key]);
-
-    if (
-      String(form[key]).trim() === "" ||
-      !Number.isSafeInteger(value) ||
-      value < 0 ||
-      value > 2147483647
-    ) {
-      return "El stock y el mínimo deben ser números enteros no negativos.";
-    }
-  }
-
-  const price = Number(form.price);
-
-  if (
-    String(form.price).trim() === "" ||
-    !Number.isFinite(price) ||
-    price < 0 ||
-    price > 9999999999.99 ||
-    Math.abs(price * 100 - Math.round(price * 100)) > 0.0001
-  ) {
-    return "Ingresa un precio válido con hasta dos decimales.";
-  }
-
-  return "";
-}
-
-// ─── Estilos ────────────────────────────────────────────────
 
 const STYLES = `
 .inv-page {
@@ -750,6 +700,7 @@ export default function Productos({
   const [pageSize, setPageSize] = useState(15);
   const [modal, setModal] = useState(() => params.get("accion") === "nuevo" && !readOnly ? { product: null, trigger: null } : null);
   const [saleOpen, setSaleOpen] = useState(false);
+  const [detailId, setDetailId] = useState(null);
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState("");
 
@@ -1029,8 +980,8 @@ export default function Productos({
       <style>{STYLES}</style>
       <header className="inv-header">
         <div>
-          <span className="inv-eyebrow">GESTIÓN DE ALMACÉN</span>
-          <h1>Inventario de productos</h1>
+          <span className="inv-eyebrow">CATÁLOGO</span>
+          <h1>Catálogo de productos</h1>
         </div>
 
         <div className="inv-actions">
@@ -1282,6 +1233,10 @@ export default function Productos({
 
                     <td className="inv-number">
                       <div className="inv-row-actions">
+                        <button type="button" aria-label={`Ver ficha de ${product.name}`} title="Ver ficha del producto"
+                          onClick={() => setDetailId(product.id)}>
+                          <Eye size={15} />
+                        </button>
                         <button
                           type="button"
                           disabled={!canEdit}
@@ -1411,6 +1366,9 @@ export default function Productos({
         onSave={onSale} onRetry={retryWrite} onClose={() => setSaleOpen(false)}
         onSuccess={() => { setSaleOpen(false); notify('Venta registrada. El precio aplicado queda guardado en el historial.'); }} />}
 
+      {detailId !== null && <ProductDetailsDialog product={products.find(product => product.id === detailId)}
+        onClose={() => setDetailId(null)} />}
+
       {modal && !readOnly && (
         <ProductModal
           product={modal.product}
@@ -1453,307 +1411,29 @@ export default function Productos({
 
 // ─── Formulario de registro / edición ────────────────────────
 
-function ProductModal({
-  product,
-  categories,
-  products,
-  defaultMinStock,
-  currentUser,
-  getCreatedBy,
-  busy,
-  uncertain,
-  error,
-  onClose,
-  onSave,
-  onRetry,
-}) {
-  const [form, setForm] = useState({
-    name: product?.name ?? "",
-    sku: product?.sku ?? "",
-    category: product?.category ?? categories[0] ?? "",
-    stock: product?.stock ?? 0,
-    minStock: product?.minStock ?? defaultMinStock,
-    price: product?.price ?? 0,
-    createdByName:
-    product?.createdByName ||
-    product?.created_by_name ||
-    "",
-  });
-
-  const [validation, setValidation] = useState("");
+function ProductModal({ product, categories, products, defaultMinStock, busy, uncertain, error, onClose, onSave, onRetry }) {
   const dialog = useRef(null);
-
   const disabled = busy || uncertain;
-
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
+    const element = dialog.current;
+    const previous = document.body.style.overflow;
+    const focus = document.activeElement;
+    element.showModal();
     document.body.style.overflow = "hidden";
-
-    dialog.current?.querySelector("input")?.focus();
-
     return () => {
-      document.body.style.overflow = previousOverflow;
+      element.close();
+      document.body.style.overflow = previous;
+      if (focus?.isConnected) focus.focus();
     };
   }, []);
-
-  function handleKeyboard(event) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      if (!disabled) onClose();
-      return;
-    }
-
-    if (event.key !== "Tab") return;
-
-    const nodes = [
-      ...dialog.current.querySelectorAll(
-        'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex="0"]'
-      ),
-    ];
-
-    if (!nodes.length) {
-      event.preventDefault();
-      dialog.current.focus();
-      return;
-    }
-
-    const first = nodes[0];
-    const last = nodes[nodes.length - 1];
-    const focused = document.activeElement;
-
-    if (
-      event.shiftKey &&
-      (focused === first || !nodes.includes(focused))
-    ) {
-      event.preventDefault();
-      last.focus();
-    } else if (
-      !event.shiftKey &&
-      (focused === last || !nodes.includes(focused))
-    ) {
-      event.preventDefault();
-      first.focus();
-    }
-  }
-
-  function update(event) {
-    const { name, value } = event.target;
-    setValidation("");
-    setForm((previous) => ({ ...previous, [name]: value }));
-  }
-
-  function submit(event) {
-    event.preventDefault();
-    if (disabled) return;
-    const problem = validateProduct(form, products, product?.id);
-    if (problem) { setValidation(problem); return; }
-    if (!form.createdByName.trim()) {
-      setValidation("Escribe el nombre de quien registra el producto.");
-      return;
-    }
-
-    onSave({
-      name: form.name.trim(),
-      sku: form.sku.trim(),
-      category: form.category,
-      stock: Number(form.stock),
-      minStock: Number(form.minStock),
-      price: Number(form.price),
-      createdByName: form.createdByName.trim(),
-    });
-  }
-
-  const availableCategories = [
-    ...new Set([...categories, form.category].filter(Boolean)),
-  ];
-
   return (
-    <div className="inv-overlay">
-      <section
-        ref={dialog}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="product-dialog-title"
-        className="inv-dialog"
-        onKeyDown={handleKeyboard}
-      >
-        <header>
-          <div>
-            <span className="inv-eyebrow">INVENTARIO</span>
-            <h2 id="product-dialog-title">
-              {product ? "Editar producto" : "Nuevo producto"}
-            </h2>
-          </div>
-
-          <button
-            type="button"
-            className="inv-button inv-icon"
-            disabled={disabled}
-            aria-label="Cerrar formulario"
-            onClick={onClose}
-          >
-            <X size={19} />
-          </button>
-        </header>
-
-        <form onSubmit={submit}>
-          <label className="inv-field">
-            Nombre del producto
-            <input
-              name="name"
-              required
-              maxLength={200}
-              disabled={disabled}
-              value={form.name}
-              onChange={update}
-              placeholder="Ej. Monitor LG 24 pulgadas"
-            />
-          </label>
-
-          <div className="inv-form-grid">
-            <label className="inv-field">
-              SKU
-              <input
-                name="sku"
-                required
-                maxLength={100}
-                disabled={disabled}
-                value={form.sku}
-                onChange={update}
-                placeholder="Ej. MON-024"
-              />
-            </label>
-
-            <label className="inv-field">
-              Categoría
-              <select
-                name="category"
-                required
-                disabled={disabled}
-                value={form.category}
-                onChange={update}
-              >
-                <option value="">Seleccionar categoría</option>
-
-                {availableCategories.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="inv-form-grid">
-            <label className="inv-field">
-              {product ? "Stock registrado" : "Stock inicial"}
-              <input
-                name="stock"
-                required
-                type="number"
-                min="0"
-                step="1"
-                max="2147483647"
-                disabled={disabled}
-                value={form.stock}
-                onChange={update}
-                placeholder="Ej. 10"
-              />
-            </label>
-
-            <label className="inv-field">
-              Stock mínimo
-              <input
-                name="minStock"
-                required
-                type="number"
-                min="0"
-                step="1"
-                max="2147483647"
-                disabled={disabled}
-                value={form.minStock}
-                onChange={update}
-              />
-            </label>
-          </div>
-
-          <label className="inv-field">
-            Precio unitario (S/)
-            <input
-              name="price"
-              required
-              type="number"
-              min="0"
-              step="0.01"
-              max="9999999999.99"
-              disabled={disabled}
-              value={form.price}
-              onChange={update}
-            />
-          </label>
-
-          <label className="inv-field">
-            Registrado por:
-            <input
-              name="createdByName"
-              type="text"
-              required
-              maxLength={120}
-              disabled={disabled}
-              value={form.createdByName}
-              onChange={update}
-              placeholder="Nombre de quien registra el producto"
-            />
-          </label>
-          
-          {(validation || error) && (
-            <p role="alert" className="inv-error">
-              {validation || error}
-            </p>
-          )}
-
-          {uncertain && (
-            <div className="inv-error" role="status">
-              Hay una operación pendiente de confirmación.
-
-              {onRetry && (
-                <button
-                  type="button"
-                  className="inv-button"
-                  disabled={busy}
-                  onClick={onRetry}
-                >
-                  Verificar / reintentar operación
-                </button>
-              )}
-            </div>
-          )}
-
-          <footer>
-            <button
-              type="button"
-              className="inv-button"
-              disabled={disabled}
-              onClick={onClose}
-            >
-              Cancelar
-            </button>
-
-            <button
-              type="submit"
-              className="inv-button inv-primary"
-              disabled={disabled}
-            >
-              {busy
-                ? "Guardando…"
-                : product
-                ? "Guardar cambios"
-                : "Registrar producto"}
-            </button>
-          </footer>
-        </form>
-      </section>
-    </div>
+    <dialog ref={dialog} className={catalogStyles.dialog} aria-label={product ? "Editar producto" : "Nuevo producto"}
+      onCancel={event => { event.preventDefault(); if (!disabled) onClose(); }}>
+      <div className={catalogStyles.dialogToolbar}>
+        <button type="button" aria-label="Cerrar formulario" disabled={disabled} onClick={onClose}><X size={18} /> Cerrar</button>
+      </div>
+      <ProductForm product={product} products={products} categories={categories} defaultMinStock={defaultMinStock}
+        canReadPurchaseCost onSave={onSave} onRetry={onRetry} busy={busy} uncertain={uncertain} error={error} />
+    </dialog>
   );
 }

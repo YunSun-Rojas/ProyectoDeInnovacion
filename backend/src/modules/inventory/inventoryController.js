@@ -8,9 +8,9 @@ export function createInventoryController(inventory) {
     async change({ req, session: { client, user }, send }) {
       const body = await readBody(req);
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.requestId)
-        || !['add', 'edit', 'delete', 'adjust', 'sale'].includes(body.action)) throw fail(400, 'Operación inválida.');
+        || !['add', 'edit', 'catalog_edit', 'delete', 'adjust', 'sale'].includes(body.action)) throw fail(400, 'Operación inválida.');
       if (body.action !== 'add' && (!Number.isSafeInteger(body.productId) || body.productId <= 0)) throw fail(400, 'Producto inválido.');
-      if (['edit', 'delete', 'sale'].includes(body.action) && (!Number.isSafeInteger(body.version) || body.version <= 0)) throw fail(400, 'Versión inválida.');
+      if (['edit', 'catalog_edit', 'delete', 'sale'].includes(body.action) && (!Number.isSafeInteger(body.version) || body.version <= 0)) throw fail(400, 'Versión inválida.');
       if (!body.data || Array.isArray(body.data) || typeof body.data !== 'object') throw fail(400, 'Datos inválidos.');
       if (body.action === 'adjust' && (!Number.isSafeInteger(body.data.delta)
         || body.data.delta === 0 || Math.abs(body.data.delta) > 2147483647)) {
@@ -18,7 +18,8 @@ export function createInventoryController(inventory) {
       }
       let payload;
       try {
-        payload = ['add', 'edit'].includes(body.action) ? inventory.productPayload(body.data)
+        payload = body.action === 'catalog_edit' ? inventory.catalogPayload(body.data)
+          : ['add', 'edit'].includes(body.action) ? inventory.productPayload(body.data)
           : body.action === 'sale' ? inventory.salePayload(body.data)
           : body.action === 'adjust' ? { delta: body.data.delta } : {};
       } catch (error) { throw fail(400, error.message); }

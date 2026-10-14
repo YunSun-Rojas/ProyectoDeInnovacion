@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useOutletContext } from "react-router-dom";
+import { Routes, Route, Navigate, useOutletContext, useLocation } from "react-router-dom";
 import { LoginPage } from "./modules/auth/pages/LoginPage";
 import InventarioLayout from "./modules/inventario/InventarioLayout";
 import Dashboard from "./modules/inventario/pages/Dashboard";
@@ -6,6 +6,7 @@ import Productos from "./modules/inventario/pages/Productos";
 import Prediccion from "./modules/inventario/pages/Prediccion";
 import Vision from "./modules/inventario/pages/Vision";
 import Historial from "./modules/inventario/pages/Historial";
+import Existencias from "./modules/inventario/pages/Existencias";
 import Config from "./modules/inventario/pages/Config";
 import { useAuthSession } from "./modules/auth/hooks/useAuthSession";
 
@@ -27,6 +28,11 @@ function PrediccionRoute() {
   return <Prediccion {...useOutletContext()} />;
 }
 
+function HistorialRedirect() {
+  const { search, hash } = useLocation();
+  return <Navigate to={{ pathname: '/dashboard/movimientos', search, hash }} replace />;
+}
+
 export default function App() {
   const { session, loading } = useAuthSession();
   if (loading) return <div role="status" style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#F1F5F9', color: '#1F2937' }}>Cargando sesión…</div>;
@@ -39,7 +45,9 @@ export default function App() {
         <Route path="productos" element={<ProductosRoute />} />
         <Route path="prediccion" element={<PrediccionRoute />} />
         <Route path="vision" element={<Vision />} />
-        <Route path="historial" element={<Historial />} />
+        <Route path="existencias" element={<Existencias />} />
+        <Route path="movimientos" element={<Historial />} />
+        <Route path="historial" element={<HistorialRedirect />} />
         <Route path="configuracion" element={<Config />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>

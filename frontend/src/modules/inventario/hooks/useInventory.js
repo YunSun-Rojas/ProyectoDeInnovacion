@@ -43,7 +43,7 @@ export function useInventory(userId) {
     setAttempt(previous => previous + 1);
   };
 
-  const execute = async request => {
+  const execute = async (request, refreshAfterReplay = false) => {
     if (locked.current) return false;
     locked.current = true;
     setSaving(true);
@@ -53,6 +53,9 @@ export function useInventory(userId) {
       const result = await saveInventoryChange(request);
       confirmed = true;
       if (!active.current) return false;
+      // Una RPC idempotente puede devolver la instantánea antigua de su primer
+      // resultado. Tras reintentar, consultar el estado vigente sin otra escritura.
+      const latest = refreshAfterReplay ? await loadInventory() : null;
       const product = result.product;
       const movement = result.movement;
       setState(previous => ({ ...previous,
@@ -61,6 +64,7 @@ export function useInventory(userId) {
           : previous.products.filter(p => p.id !== request.productId)),
         movements: [movement, ...previous.movements.filter(m => m.id !== movement.id)],
         sales: result.sale ? [result.sale, ...(previous.sales ?? []).filter(sale => sale.id !== result.sale.id)] : (previous.sales ?? []),
+        ...(latest ?? {}),
       }));
       pendingRequest.current = null;
       setUncertain(false);
@@ -93,9 +97,9 @@ export function useInventory(userId) {
   };
 
   return { ...state, retry, saving, writeError, uncertain,
-    retryWrite: () => pendingRequest.current ? execute(pendingRequest.current) : Promise.resolve(false),
+    retryWrite: () => pendingRequest.current ? execute(pendingRequest.current, true) : Promise.resolve(false),
     onAdd: data => mutate('add', null, data),
-    onEdit: (product, data) => mutate('edit', product, data),
+    onEdit: (product, data) => mutate('catalog_edit', product, data),
     onDelete: product => mutate('delete', product),
     onAdjustStock: (product, delta) => mutate('adjust', product, { delta }),
     onSale: (product, data) => state.salesEnabled ? mutate('sale', product, data) : Promise.resolve(false),

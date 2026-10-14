@@ -47,7 +47,7 @@ export async function readInventory(client, userId, signal) {
   const salesEnabled = salesCapability.data === true;
   const [categoryRows, productRows, movementRows, salesRows] = await Promise.all([
     readRows(client, 'categories', 'id,name', signal),
-    readRows(client, 'products', `id,sku,name,category_id,stock,price,min_stock${readOnly ? '' : ',version'}`, signal),
+    readRows(client, 'products', `id,sku,name,category_id,stock,price,min_stock,brand,model,characteristics,barcode,purchase_cost,unit_of_measure,image_path,is_active,created_at,updated_at,created_by_name,source_status${readOnly ? '' : ',version'}`, signal),
     readOnly ? [] : readRows(client, 'inventory_movements', 'id,product_name,sku,type,stock_before,stock_after,quantity,actor_email,reason,created_at', signal),
     salesEnabled ? readRows(client, 'inventory_sales', 'id,product_id,product_name,sku,quantity,unit_price,total,movement_id,actor_email,created_at', signal) : [],
   ]);

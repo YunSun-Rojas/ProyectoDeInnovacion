@@ -1,0 +1,15 @@
+.group { flex-shrink: 0; }
+.heading { font: 700 9px/1.5 Inter, system-ui, sans-serif; letter-spacing: 1px; color: #ffdfeb; margin: 12px 12px 5px; }
+.group:first-child .heading { margin-top: 0; }
+.group button:focus-visible { outline: 2px solid white; outline-offset: -3px; }
+.group button:hover:not([aria-current="page"]) { background: #ffffff18 !important; }
+@media (min-width: 641px) and (max-width: 1100px) {
+  .group + .group { border-top: 1px solid #ffffff30; padding-top: 5px; }
+  .group button { overflow: hidden; }
+  .heading { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}
+@media (max-width: 640px) {
+  .group { display: contents; }
+  .group button { width: auto !important; flex: 0 0 auto; }
+  .heading { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}

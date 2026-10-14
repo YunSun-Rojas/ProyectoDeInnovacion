@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createApi } from '../src/app.js';
-import { salePayload, mapSale, mapMovement } from '../src/modules/inventory/inventoryService.js';
+import { salePayload, mapSale, mapMovement, productPayload, catalogPayload, mapProduct } from '../src/modules/inventory/inventoryService.js';
 
 async function setup(t, options = {}) {
   const calls = [];
@@ -24,6 +24,7 @@ async function setup(t, options = {}) {
     loadInventory: async (_client, id) => { calls.push({ reader: id }); return { products: [], categories: [], movements: [], readOnly: false }; },
     saveInventoryChange: async (_client, request) => { calls.push({ request }); return { product: null, movement: { id: 1 } }; },
     productPayload: value => value,
+    catalogPayload,
     mapProduct: value => value,
     mapMovement: value => value,
     salePayload,
@@ -46,6 +47,72 @@ async function setup(t, options = {}) {
   };
   return { calls, request, login, base };
 }
+
+test('catálogo integrado: alta, lectura, edición, versión y reintento sin tocar stock (API en memoria)', async t => {
+  let row;
+  const history = [], saved = new Map();
+  const categories = [{ id: 'c1', name: 'Periféricos' }];
+  const { request, login, calls } = await setup(t, { inventory: {
+    productPayload, catalogPayload, mapProduct, mapMovement: value => value,
+    loadInventory: async () => ({ products: row ? [mapProduct(row, categories)] : [], categories, movements: history, readOnly: false }),
+    saveInventoryChange: async (_client, value) => {
+      calls.push({ request: value });
+      if (saved.has(value.p_request_id)) {
+        const previous = saved.get(value.p_request_id);
+        if (JSON.stringify(value) !== previous.input) throw Object.assign(new Error('INVENTORY_REQUEST_CONFLICT'), { status: 400 });
+        return previous.result;
+      }
+      if (value.p_action === 'catalog_edit' && value.p_expected_version !== row.version) throw Object.assign(new Error('Otra persona modificó este producto.'), { status: 400 });
+      if (value.p_action === 'add' && row?.sku === value.p_data.sku) throw Object.assign(new Error('Ya existe un producto con ese SKU.'), { status: 400 });
+      row = { ...(row ?? { id: 1, category_id: 1, version: 0, source_status: 'Datos Correcto', image_path: 'preservada.webp' }), ...value.p_data,
+        version: (row?.version ?? 0) + 1 };
+      const result = { product: structuredClone(row), movement: { id: history.length + 1 } };
+      history.push(result.movement);
+      saved.set(value.p_request_id, { input: JSON.stringify(value), result });
+      return result;
+    },
+  } });
+  const { cookie } = await login();
+  const post = body => request('/inventory/changes', { method: 'POST', cookie, body });
+  const initial = { name: 'Mouse', sku: 'CAT-1', category: 'Periféricos', stock: 8, minStock: 2, price: 90,
+    brand: 'Marca', model: 'Modelo', characteristics: 'USB', barcode: '000456', purchaseCost: 35.25,
+    unitOfMeasure: 'Unidad', isActive: false, createdByName: 'Operador' };
+  const add = { requestId: '00000000-0000-4000-8000-000000000021', action: 'add', productId: null, version: null, data: initial };
+  assert.equal((await post(add)).status, 200);
+  assert.equal(calls.at(-1).request.p_action, 'add');
+  const loaded = (await (await request('/inventory', { cookie })).json()).products[0];
+  assert.equal(loaded.purchaseCost, 35.25);
+  assert.equal(loaded.createdByName, 'Operador');
+  assert.equal(loaded.barcode, '000456');
+  assert.equal(loaded.isActive, false);
+  const { stock, ...data } = initial;
+  const edit = { requestId: '00000000-0000-4000-8000-000000000022', action: 'catalog_edit', productId: 1, version: 1, data: { ...data, model: 'Nuevo modelo', purchaseCost: 40 } };
+  for (const patch of [{ stock }, { stock: 0 }, { delta: 1 }, { catalog_only: true }]) {
+    const count = history.length;
+    assert.equal((await post({ ...edit, data: { ...edit.data, ...patch } })).status, 400);
+    assert.equal(history.length, count);
+  }
+  const edited = await post(edit);
+  assert.equal(edited.status, 200);
+  const result = await edited.json();
+  assert.equal(result.product.stock, 8);
+  assert.equal(result.product.price, 90);
+  assert.equal(result.product.imagePath, 'preservada.webp');
+  assert.equal(result.product.sourceStatus, 'Datos Correcto');
+  const sent = calls.at(-1).request;
+  assert.equal(sent.p_action, 'catalog_edit');
+  assert.equal(sent.p_expected_version, 1);
+  for (const key of ['stock', 'delta', 'catalog_only', 'image_path', 'source_status']) assert(!Object.hasOwn(sent.p_data, key));
+  assert.equal((await post(edit)).status, 200);
+  assert.equal(history.length, 2);
+  assert.equal((await post({ ...edit, requestId: '00000000-0000-4000-8000-000000000023' })).status, 400);
+  const reloaded = (await (await request('/inventory', { cookie })).json()).products[0];
+  assert.equal(reloaded.model, 'Nuevo modelo');
+  assert.equal(reloaded.purchaseCost, 40);
+  assert.equal(reloaded.version, 2);
+  assert.equal((await post({ ...add, requestId: '00000000-0000-4000-8000-000000000024' })).status, 400);
+  assert.equal((await request('/inventory')).status, 401);
+});
 
 test('login a través del proxy Vite conserva el origen y rechaza sitios externos', async t => {
   const { base } = await setup(t);

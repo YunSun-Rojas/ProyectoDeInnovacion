@@ -9,11 +9,11 @@ export default function Prediccion({ products = [] }) {
             Predicción de Demanda (IA)
           </h1>
           <span style={{ background: "var(--inventory-accent-tint, #FBE6E7)", color: "#D62839", padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
-            <Sparkles size={14} /> Modelo ML Activo
+            <Sparkles size={14} /> Demostración
           </span>
         </div>
         <p style={{ margin: "4px 0 0", fontFamily: "Inter, sans-serif", fontSize: 14, color: "var(--inventory-muted, #6E6C68)" }}>
-          Proyección automatizada de agotamiento de stock basada en ventas históricas.
+          Estimación demostrativa a partir del stock actual. No utiliza un modelo entrenado ni analiza ventas históricas.
         </p>
       </div>
 
@@ -31,14 +31,14 @@ export default function Prediccion({ products = [] }) {
               </div>
 
               <div style={{ margin: "16px 0", padding: "12px", background: "var(--inventory-bg, #F1F5F9)", borderRadius: 8 }}>
-                <span style={{ fontSize: 12, color: "var(--inventory-muted, #6E6C68)", display: "block" }}>Agotamiento Estimado</span>
+                <span style={{ fontSize: 12, color: "var(--inventory-muted, #6E6C68)", display: "block" }}>Agotamiento estimado (simulación)</span>
                 <span style={{ fontFamily: "Oswald, sans-serif", fontSize: 24, fontWeight: 600, color: estimatedDays <= 5 ? "var(--inventory-danger, #8F1B26)" : "var(--inventory-ink, #17171A)" }}>
                   ~ {estimatedDays} días
                 </span>
               </div>
 
               <p style={{ margin: 0, fontSize: 13, color: "var(--inventory-muted, #6E6C68)", display: "flex", alignItems: "center", gap: 6 }}>
-                <AlertCircle size={14} color="var(--inventory-warning, #B4700B)" /> Se sugiere reordenar {p.minStock * 2} unidades pronto.
+                <AlertCircle size={14} color="var(--inventory-warning, #B4700B)" /> Ejemplo demostrativo: reordenar {p.minStock * 2} unidades pronto.
               </p>
             </div>
           );

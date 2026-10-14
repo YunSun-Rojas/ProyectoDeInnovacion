@@ -1,4 +1,5 @@
 import { readInventory, mutateInventory } from './inventoryRepository.js';
+import { catalogPatch, money } from '../../../../shared/catalogProduct.js';
 
 export async function loadInventory(client, userId, signal) {
   if (!client) throw new Error('No se ha configurado la conexión con Supabase.');
@@ -33,6 +34,11 @@ export function mapProduct(product, categories) {
     stock: product.stock,
     price,
     minStock: product.min_stock,
+    brand: product.brand ?? '', model: product.model ?? '', characteristics: product.characteristics ?? '',
+    barcode: product.barcode ?? null, purchaseCost: product.purchase_cost == null ? null : money(product.purchase_cost, 'Costo de compra'),
+    unitOfMeasure: product.unit_of_measure ?? 'Unidad', imagePath: product.image_path ?? null,
+    isActive: product.is_active ?? true, sourceStatus: product.source_status ?? '',
+    createdAt: product.created_at ?? null, updatedAt: product.updated_at ?? null, createdByName: product.created_by_name ?? null,
     ...(product.version != null ? { version: product.version } : {}),
     // Compatibilidad con las métricas actuales; aún no hay historial de ventas.
     unitsSoldThisMonth: 0,
@@ -86,8 +92,29 @@ export function productPayload(data) {
     || !Number.isFinite(price) || price < 0 || price >= 1e10 || Number(price.toFixed(2)) !== price) {
     throw new Error('Completa nombre, SKU y categoría. Usa cantidades enteras no negativas y un precio válido con hasta dos decimales.');
   }
-  return { name: data.name.trim(), sku: data.sku.trim(), category: data.category,
+  const payload = { name: data.name.trim(), sku: data.sku.trim(), category: data.category,
     stock, price, min_stock: minStock };
+  const names = { brand: 'brand', model: 'model', characteristics: 'characteristics', barcode: 'barcode',
+    purchaseCost: 'purchase_cost', unitOfMeasure: 'unit_of_measure', isActive: 'is_active' };
+  for (const [key, value] of Object.entries(catalogPatch(data, { canWritePurchaseCost: true }))) {
+    payload[names[key]] = ['brand', 'model', 'characteristics'].includes(key) ? (value ?? '') : value;
+  }
+  if (Object.hasOwn(data, 'createdByName')) {
+    if (typeof data.createdByName !== 'string' || !data.createdByName.trim() || data.createdByName.trim().length > 120) {
+      throw new Error('Escribe un nombre de registro de hasta 120 caracteres.');
+    }
+    payload.created_by_name = data.createdByName.trim();
+  }
+  return payload;
+}
+
+export function catalogPayload(data) {
+  if (!data || ['stock', 'delta', 'catalog_only'].some(key => Object.hasOwn(data, key))) {
+    throw new Error('La edición descriptiva no admite cantidades ni ajustes de stock.');
+  }
+  const payload = productPayload({ ...data, stock: 0 });
+  delete payload.stock;
+  return payload;
 }
 
 const writeErrors = {
