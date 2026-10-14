@@ -271,28 +271,6 @@ export default function Dashboard({ products = [], categories = [], movements = 
         />
       </div>
 
-      {/* ── KPIs Row 2 (2 secundarios) ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 440px), 1fr))", gap: 16, marginBottom: 24 }}>
-        <MiniStatCard
-          to="/dashboard/productos"
-          title="Tasa de Rotación de Inventario"
-          value={`${metrics.turnoverRate}%`}
-          desc="Ingresos / Valor inventario (mensual)"
-          icon={RefreshCw}
-          color={parseFloat(metrics.turnoverRate) >= 15 ? C.success : C.warning}
-          hint={parseFloat(metrics.turnoverRate) >= 15 ? "Rotación saludable" : "Por debajo del umbral óptimo (15%)"}
-        />
-        <MiniStatCard
-          to="/dashboard/productos"
-          title="Categorías Gestionadas"
-          value={categories.length}
-          desc={`${categories.length} familias de productos activas`}
-          icon={Layers}
-          color={C.info}
-          hint={`${metrics.categoryMetrics.length} categorías con productos`}
-        />
-      </div>
-
       {/* ── Insights Automáticos ── */}
       {metrics.insights.length > 0 && (
         <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
@@ -419,22 +397,6 @@ export default function Dashboard({ products = [], categories = [], movements = 
             ))}
           </div>
         </div>
-
-        {/* Gráfico: Rotación por Categoría (Barras horizontales) */}
-        <div {...cardNavigation("productos")} style={{ cursor: "pointer", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 22px", display: "flex", flexDirection: "column" }}>
-          <ChartHeader icon={Activity} title="Tasa de Rotación" sub="Ventas / Stock disponible (%)" to="/dashboard/productos" />
-          <div style={{ marginTop: 12, flex: 1, maxHeight: 200, overflowY: "auto", paddingRight: 6, display: "flex", flexDirection: "column", gap: 8 }}>
-            {metrics.categoryMetrics.map(cat => (
-                <RotationBar
-                  key={cat.name}
-                  name={cat.name}
-                  value={parseFloat(cat.rotacion)}
-                  max={Math.max(...metrics.categoryMetrics.map(c => parseFloat(c.rotacion)))}
-                />
-              ))}
-          </div>
-        </div>
-
       </div>
 
       {/* ── Fila inferior: Top productos + Tabla de reorden ── */}

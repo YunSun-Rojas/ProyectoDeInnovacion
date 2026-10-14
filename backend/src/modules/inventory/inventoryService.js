@@ -30,6 +30,7 @@ export function mapProduct(product, categories) {
     stock: product.stock,
     price,
     minStock: product.min_stock,
+    ...(product.created_by_name != null ? { createdByName: product.created_by_name } : {}),
     ...(product.version != null ? { version: product.version } : {}),
     // Compatibilidad con las métricas actuales; aún no hay historial de ventas.
     unitsSoldThisMonth: 0,
@@ -60,8 +61,17 @@ export function productPayload(data) {
     || !Number.isFinite(price) || price < 0 || price >= 1e10 || Number(price.toFixed(2)) !== price) {
     throw new Error('Completa nombre, SKU y categoría. Usa cantidades enteras no negativas y un precio válido con hasta dos decimales.');
   }
+  let registeredBy;
+  if (Object.hasOwn(data, 'createdByName')) {
+    if (typeof data.createdByName !== 'string' || !data.createdByName.trim()
+      || data.createdByName.trim().length > 120) {
+      throw new Error('Escribe el nombre de quien registra el producto (máximo 120 caracteres).');
+    }
+    registeredBy = data.createdByName.trim();
+  }
   return { name: data.name.trim(), sku: data.sku.trim(), category: data.category,
-    stock, price, min_stock: minStock };
+    stock, price, min_stock: minStock,
+    ...(registeredBy !== undefined ? { created_by_name: registeredBy } : {}) };
 }
 
 const writeErrors = {

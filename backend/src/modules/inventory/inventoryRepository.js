@@ -44,7 +44,7 @@ export async function readInventory(client, userId, signal) {
   const readOnly = capability.data !== true;
   const [categoryRows, productRows, movementRows] = await Promise.all([
     readRows(client, 'categories', 'id,name', signal),
-    readRows(client, 'products', `id,sku,name,category_id,stock,price,min_stock${readOnly ? '' : ',version'}`, signal),
+    readRows(client, 'products', `id,sku,name,category_id,stock,price,min_stock,created_by_name${readOnly ? '' : ',version'}`, signal),
     readOnly ? [] : readRows(client, 'inventory_movements', 'id,product_name,sku,type,stock_before,stock_after,quantity,actor_email,reason,created_at', signal),
   ]);
   signal?.throwIfAborted();

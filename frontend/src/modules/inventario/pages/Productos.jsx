@@ -1069,18 +1069,13 @@ export default function Productos({
             </article>
           ))}
         </div>
-
-        <p className="inv-value-note">
-          La valorización usa el precio registrado. Si es precio de
-          venta, este total no representa el costo del inventario.
-        </p>
       </section>
 
       <section className="inv-panel" aria-label="Listado de productos">
         <div className="inv-toolbar">
           <div className="inv-search">
             <Search size={17} aria-hidden="true" />
-
+            
             <input
               aria-label="Buscar producto por nombre o SKU"
               placeholder="Buscar producto o SKU…"
@@ -1526,21 +1521,33 @@ function ProductModal({
   }
 
   function submit(event) {
-    if (!form.createdByName.trim()) {
-      setValidation("Escribe el nombre de quien registra el producto.");
-      return;
-    }
+  // Impide que el navegador recargue la página.
+  event.preventDefault();
 
-    onSave({
-      name: form.name.trim(),
-      sku: form.sku.trim(),
-      category: form.category,
-      stock: Number(form.stock),
-      minStock: Number(form.minStock),
-      price: Number(form.price),
-      createdByName: form.createdByName.trim(),
-    });
+  if (disabled) return;
+
+  const message = validateProduct(form, products, product?.id);
+  setValidation(message);
+
+  if (message) return;
+
+  if (!form.createdByName?.trim()) {
+    setValidation(
+      "Escribe el nombre de quien registra el producto."
+    );
+    return;
   }
+
+  onSave({
+    name: form.name.trim(),
+    sku: form.sku.trim(),
+    category: form.category,
+    stock: Number(form.stock),
+    minStock: Number(form.minStock),
+    price: Number(form.price),
+    createdByName: form.createdByName.trim(),
+  });
+}
 
   const availableCategories = [
     ...new Set([...categories, form.category].filter(Boolean)),

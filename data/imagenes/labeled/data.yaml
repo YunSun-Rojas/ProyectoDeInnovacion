@@ -1,0 +1,13 @@
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 1
+names: ['caja-monitor']
+
+roboflow:
+  workspace: yun-sun-jessy-s-workspace
+  project: eagle-gaming-deteccion-monitores
+  version: 6
+  license: MIT
+  url: https://universe.roboflow.com/yun-sun-jessy-s-workspace/eagle-gaming-deteccion-monitores/dataset/6
