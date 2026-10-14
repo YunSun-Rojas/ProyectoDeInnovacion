@@ -5,7 +5,7 @@ import s from '../pages/Dashboard.module.css';
 
 const money = value => new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(value);
 
-export default function SaleDialog({ products, saving, uncertain, error, onSave, onRetry, onClose, onSuccess }) {
+export default function SaleDialog({ products, saving, uncertain, error, onSave, onRetry, onClose, onSuccess, className = '' }) {
   const dialog = useRef(null);
   const locked = useRef(false);
   const [productId, setProductId] = useState('');
@@ -43,7 +43,7 @@ export default function SaleDialog({ products, saving, uncertain, error, onSave,
     finally { locked.current = false; setPending(false); }
   }
   const valid = product && !saleValidation(product, quantity, price);
-  return <dialog className={s.dialog} ref={dialog} aria-labelledby="sale-title" onCancel={e => { e.preventDefault(); if (!disabled) onClose(); }}>
+  return <dialog className={`${s.dialog} ${className}`} ref={dialog} aria-labelledby="sale-title" onCancel={e => { e.preventDefault(); if (!disabled) onClose(); }}>
     <div className={s.dialogHeading}><div><span className={s.eyebrow}>SALIDA POR VENTA</span><h2 id="sale-title">Registrar venta</h2></div><button type="button" className={s.iconButton} aria-label="Cerrar venta" disabled={disabled} onClick={onClose}><X size={20} /></button></div>
     <form onSubmit={submit}>
       <label htmlFor="sale-product">Producto</label><select id="sale-product" value={productId} onChange={selectProduct} required disabled={disabled}><option value="">Selecciona un producto</option>{products.filter(p => p.stock > 0).map(p => <option key={p.id} value={String(p.id)}>{p.name} · {p.sku}</option>)}</select>

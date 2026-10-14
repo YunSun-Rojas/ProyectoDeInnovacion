@@ -4,6 +4,7 @@ import SaleDialog from "../components/SaleDialog";
 import ProductDetailsDialog from "../components/catalog/ProductDetailsDialog";
 import ProductForm from "../components/catalog/ProductForm";
 import catalogStyles from "../components/catalog/ProductCatalog.module.css";
+import ui from './InventoryUI.module.css';
 
 import {
   Search,
@@ -976,12 +977,13 @@ export default function Productos({
   ];
 
   return (
-    <main className="inv-page">
+    <main className={`inv-page ${ui.workspace}`}>
       <style>{STYLES}</style>
       <header className="inv-header">
         <div>
           <span className="inv-eyebrow">CATÁLOGO</span>
           <h1>Catálogo de productos</h1>
+          <p>Organiza tus productos y consulta cada referencia del inventario.</p>
         </div>
 
         <div className="inv-actions">
@@ -1170,7 +1172,8 @@ export default function Productos({
           </div>
         )}
 
-        <div className="inv-table-scroll">
+        <p className={ui.tableHint}>Desliza la tabla para consultar todas las columnas.</p>
+        <div className="inv-table-scroll" role="region" aria-label="Tabla de productos" tabIndex={0}>
           <table className="inv-table">
             <thead>
               <tr>
@@ -1362,7 +1365,7 @@ export default function Productos({
         </footer>
       </section>
 
-      {saleOpen && <SaleDialog products={products} saving={saving} uncertain={uncertain} error={writeError}
+      {saleOpen && <SaleDialog className={ui.compactDialog} products={products} saving={saving} uncertain={uncertain} error={writeError}
         onSave={onSale} onRetry={retryWrite} onClose={() => setSaleOpen(false)}
         onSuccess={() => { setSaleOpen(false); notify('Venta registrada. El precio aplicado queda guardado en el historial.'); }} />}
 

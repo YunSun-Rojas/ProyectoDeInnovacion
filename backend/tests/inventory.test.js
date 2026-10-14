@@ -12,7 +12,7 @@ const products = productosDashboard.map(p => ({
   stock: p.stock, price: p.price.toFixed(2), min_stock: p.minStock,
 }));
 
-function server({ member = true, rows = products, categoryRows = categories, cap = 500, failure, missingCount = false, enabled = false, movements = [], salesEnabled = false, sales = [] } = {}) {
+function server({ member = true, rows = products, categoryRows = categories, cap = 500, failure, missingCount = false, enabled = false, movements = [], salesEnabled = false, stockEnabled = false, sales = [], capabilityGate } = {}) {
   const requests = [];
   const client = createClient('https://inventory-test.invalid', 'test-publishable-key', {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -21,7 +21,11 @@ function server({ member = true, rows = products, categoryRows = categories, cap
       const url = new URL(input);
       const table = url.pathname.split('/').at(-1);
       requests.push({ table, method: options.method, query: url.searchParams });
+      if (table.endsWith('_enabled')) await capabilityGate?.(table);
       if (table === 'inventory_sales_enabled') return new Response(JSON.stringify(salesEnabled));
+      if (table === 'inventory_stock_enabled') return stockEnabled === null
+        ? new Response(JSON.stringify({ code: 'PGRST202', message: 'Missing function' }), { status: 404 })
+        : new Response(JSON.stringify(stockEnabled));
       if (table === 'inventory_write_enabled') return enabled === null
         ? new Response(JSON.stringify({ code: 'PGRST202', message: 'Missing function' }), { status: 404 })
         : new Response(JSON.stringify(enabled));
@@ -57,6 +61,44 @@ test('conserva los 173 productos, categorías y totales del inventario importado
   assert(requests.every(request => request.method === 'GET'));
 });
 
+test('las capacidades se consultan en paralelo después de autorizar al miembro', { timeout: 2000 }, async () => {
+  const started = [];
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const { client, requests } = server({ capabilityGate: async name => {
+    started.push(name);
+    if (started.length === 3) release();
+    await gate;
+    assert.deepEqual(requests.map(request => request.table), ['inventory_members', ...started]);
+  } });
+  try {
+    const result = await loadInventory(client, userId);
+    assert.equal(started.length, 3);
+    assert.equal(result.products.length, 173);
+  } finally { release(); }
+});
+
+test('stock se habilita solo con capacidad explícita y conserva lectura sin migración', async () => {
+  for (const stockEnabled of [true, false, null]) {
+    const { client } = server({ enabled: true, stockEnabled });
+    const result = await loadInventory(client, userId);
+    assert.equal(result.stockEnabled, stockEnabled === true);
+    assert.equal(result.products.length, 173);
+  }
+});
+
+test('movimientos por cantidad usan RPC nueva y reintentos conservan la solicitud', async () => {
+  const calls = [];
+  const client = { rpc: async (name, data) => { calls.push({ name, data }); return { data: { movement: { id: 1 }, product: { stock: 5 } } }; } };
+  for (const action of ['stock_in', 'stock_out', 'stock_adjust']) {
+    const request = { p_request_id: 'same-request', p_product_id: 1, p_expected_version: 2, p_action: action, p_data: { quantity: 3, reason: 'Motivo' } };
+    await saveInventoryChange(client, request);
+    await saveInventoryChange(client, request);
+    assert.deepEqual(calls.at(-1), calls.at(-2));
+    assert.deepEqual(calls.at(-1), { name: 'inventory_register_stock', data: { p_request_id: 'same-request', p_product_id: 1, p_expected_version: 2, p_kind: action, p_quantity: 3, p_reason: 'Motivo' } });
+  }
+});
+
 test('lee más de 1000 productos incluso cuando el servidor limita cada página', async () => {
   const rows = Array.from({ length: 1005 }, (_, i) => ({ ...products[0], id: i + 1, sku: `TEST-${i}` }));
   const { client, requests } = server({ rows, cap: 80 });
@@ -79,7 +121,7 @@ test('una tabla inexistente produce error, nunca productos locales', async () =>
 
 test('un inventario vacío autorizado permanece vacío', async () => {
   const { client } = server({ rows: [], categoryRows: [] });
-  assert.deepEqual(await loadInventory(client, userId), { products: [], categories: [], movements: [], sales: [], salesEnabled: false, readOnly: true });
+  assert.deepEqual(await loadInventory(client, userId), { products: [], categories: [], movements: [], sales: [], salesEnabled: false, stockEnabled: false, readOnly: true });
 });
 
 test('habilita la edición y adapta el historial cuando la fase 4 está instalada', async () => {
@@ -170,6 +212,22 @@ test('ventas valida importes y conserva el precio histórico separado del produc
   assert.equal(result.salesEnabled, true);
   assert.equal(mapMovement({ id: 1, type: 'Salida' }).type, 'Salida');
   assert.throws(() => mapSale({ ...raw, total: '999' }), /incompleto/);
+});
+
+test('Kardex recibe identidad de producto y todo el historial paginado sin escrituras', async () => {
+  const movements=Array.from({length:1005},(_,index)=>({ id:index+1, product_id:1, product_name:'Mouse histórico', sku:'ANTIGUO',
+    type:'Entrada', stock_before:index, stock_after:index+1, quantity:1, created_at:'2026-10-01T15:00:00Z' }));
+  const {client,requests}=server({enabled:true,movements,cap:80});
+  const result=await loadInventory(client,userId);
+  assert.equal(result.movements.length,1005);
+  assert.equal(result.movements[0].productId,1);
+  assert.equal(result.movements[0].sku,'ANTIGUO');
+  const reads=requests.filter(r=>r.table==='inventory_movements');
+  assert.equal(reads.length,13);
+  assert(reads[0].query.get('select').includes('product_id'));
+  assert(requests.every(r=>r.method==='GET'));
+  assert.equal(mapMovement({id:1,product_id:2}).productId,2);
+  assert.equal(mapMovement({id:1}).productId,null);
 });
 
 test('venta usa una RPC atómica con el precio aplicado y el mismo ID al reintentar', async () => {

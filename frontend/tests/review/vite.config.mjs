@@ -3,6 +3,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { kardexReview } from '../kardex-review/fixtures.mjs';
 
 const session = { user: { id: 'review-user', email: 'revision@example.test', user_metadata: { full_name: 'Revisión aislada' } } };
 let signedIn = true;
@@ -31,8 +32,10 @@ export default defineConfig({
         if (req.url === '/api/auth/logout') { signedIn = false; return send(200, { ok: true }); }
         if (!signedIn) return send(401, { error: 'Inicia sesión.' });
         if (req.url === '/api/inventory') {
+          if (mode === 'slow') await new Promise(resolve => setTimeout(resolve, 1800));
+          if (mode === 'kardex') return send(200, kardexReview);
           if (mode === 'error') return send(503, { error: 'Error de conexión simulado para revisión aislada.' });
-          return send(200, { products: mode === 'empty' ? [] : products, categories, movements, sales, salesEnabled: true, readOnly: mode === 'readonly' });
+          return send(200, { products: mode === 'empty' ? [] : products, categories, movements, sales, salesEnabled: true, stockEnabled: true, readOnly: mode === 'readonly' });
         }
         if (req.url === '/api/inventory/changes') {
           if (mode === 'readonly') return send(403, { error: 'Sesión de solo lectura.' });

@@ -7,6 +7,7 @@ import Prediccion from "./modules/inventario/pages/Prediccion";
 import Vision from "./modules/inventario/pages/Vision";
 import Historial from "./modules/inventario/pages/Historial";
 import Existencias from "./modules/inventario/pages/Existencias";
+import Kardex from "./modules/inventario/pages/Kardex";
 import Config from "./modules/inventario/pages/Config";
 import { useAuthSession } from "./modules/auth/hooks/useAuthSession";
 
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="vision" element={<Vision />} />
         <Route path="existencias" element={<Existencias />} />
         <Route path="movimientos" element={<Historial />} />
+        <Route path="kardex" element={<Kardex />} />
         <Route path="historial" element={<HistorialRedirect />} />
         <Route path="configuracion" element={<Config />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

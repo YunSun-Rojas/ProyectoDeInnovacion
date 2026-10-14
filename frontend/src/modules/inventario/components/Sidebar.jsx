@@ -13,6 +13,7 @@ import {
   Settings,
   LogOut,
   Package,
+  BookOpen,
 } from "lucide-react";
 
 const NAV_GROUPS = [
@@ -21,6 +22,7 @@ const NAV_GROUPS = [
   { label: 'ALMACÉN', items: [
     { id: 'existencias', label: 'Existencias', icon: Package },
     { id: 'movimientos', label: 'Movimientos', icon: History },
+    { id: 'kardex', label: 'Kardex', icon: BookOpen },
   ] },
   { label: 'INTELIGENCIA ARTIFICIAL', items: [
     { id: 'prediccion', label: 'Predicción de demanda', icon: TrendingUp },

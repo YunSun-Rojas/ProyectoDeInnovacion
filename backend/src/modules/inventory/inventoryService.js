@@ -5,7 +5,7 @@ export async function loadInventory(client, userId, signal) {
   if (!client) throw new Error('No se ha configurado la conexión con Supabase.');
   if (!userId) throw new Error('Inicia sesión para consultar el inventario.');
   signal?.throwIfAborted();
-  const { categoryRows, productRows, movementRows, salesRows, salesEnabled, readOnly } = await readInventory(client, userId, signal);
+  const { categoryRows, productRows, movementRows, salesRows, salesEnabled, stockEnabled, readOnly } = await readInventory(client, userId, signal);
   const categories = categoryRows.map(category => ({ id: `c${category.id}`, name: category.name }));
   const sales = salesRows.map(mapSale);
   const saleByMovement = new Map(sales.map(sale => [sale.movementId, sale]));
@@ -13,7 +13,7 @@ export async function loadInventory(client, userId, signal) {
     products: productRows.map(product => mapProduct(product, categories)),
     categories,
     movements: movementRows.map(row => mapMovement(row, saleByMovement.get(String(row.id)))).reverse(),
-    sales, salesEnabled,
+    sales, salesEnabled, stockEnabled,
     readOnly,
   };
 }
@@ -47,7 +47,7 @@ export function mapProduct(product, categories) {
 }
 
 export function mapMovement(row, sale) {
-  return { id: row.id, date: row.created_at, product: row.product_name, sku: row.sku,
+  return { id: row.id, productId: row.product_id ?? sale?.productId ?? null, date: row.created_at, product: row.product_name, sku: row.sku,
     type: row.type, before: row.stock_before, after: row.stock_after, quantity: row.quantity,
     user: row.actor_email, reason: row.reason,
     ...(sale ? { type: 'Venta', saleId: sale.id, unitPrice: sale.unitPrice, total: sale.total } : {}) };
@@ -73,6 +73,15 @@ export function salePayload(data) {
     throw new Error('Ingresa una cantidad entera positiva y un precio de venta válido de hasta dos decimales.');
   }
   return { quantity: data.quantity, unit_price: data.unitPrice };
+}
+
+export function stockPayload(data, action) {
+  if (!Number.isSafeInteger(data.quantity) || data.quantity === 0 || Math.abs(data.quantity) > 2147483647
+    || (action !== 'stock_adjust' && data.quantity < 0)
+    || typeof data.reason !== 'string' || !data.reason.trim() || data.reason.trim().length > 500) {
+    throw new Error('Usa una cantidad entera válida y un motivo de hasta 500 caracteres. Entradas y salidas requieren cantidades positivas.');
+  }
+  return { quantity: data.quantity, reason: data.reason.trim() };
 }
 
 export function productPayload(data) {

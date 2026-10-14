@@ -39,23 +39,33 @@ export async function readInventory(client, userId, signal) {
     throw new Error('Tu cuenta no está autorizada para consultar el inventario. Solicita acceso al administrador.');
   }
 
-  const capability = await client.rpc('inventory_write_enabled', {}, { get: true }).abortSignal(signal);
+  const [capability, salesCapability, stockCapability] = await Promise.all([
+    client.rpc('inventory_write_enabled', {}, { get: true }).abortSignal(signal),
+    client.rpc('inventory_sales_enabled', {}, { get: true }).abortSignal(signal),
+    client.rpc('inventory_stock_enabled', {}, { get: true }).abortSignal(signal),
+  ]);
   if (capability.error && !['PGRST202', '42883'].includes(capability.error.code)) checkResponse(capability);
   const readOnly = capability.data !== true;
-  const salesCapability = await client.rpc('inventory_sales_enabled', {}, { get: true }).abortSignal(signal);
   if (salesCapability.error && !['PGRST202', '42883'].includes(salesCapability.error.code)) checkResponse(salesCapability);
   const salesEnabled = salesCapability.data === true;
+  if (stockCapability.error && !['PGRST202', '42883'].includes(stockCapability.error.code)) checkResponse(stockCapability);
+  const stockEnabled = stockCapability.data === true;
   const [categoryRows, productRows, movementRows, salesRows] = await Promise.all([
     readRows(client, 'categories', 'id,name', signal),
     readRows(client, 'products', `id,sku,name,category_id,stock,price,min_stock,brand,model,characteristics,barcode,purchase_cost,unit_of_measure,image_path,is_active,created_at,updated_at,created_by_name,source_status${readOnly ? '' : ',version'}`, signal),
-    readOnly ? [] : readRows(client, 'inventory_movements', 'id,product_name,sku,type,stock_before,stock_after,quantity,actor_email,reason,created_at', signal),
+    readOnly ? [] : readRows(client, 'inventory_movements', 'id,product_id,product_name,sku,type,stock_before,stock_after,quantity,actor_email,reason,created_at', signal),
     salesEnabled ? readRows(client, 'inventory_sales', 'id,product_id,product_name,sku,quantity,unit_price,total,movement_id,actor_email,created_at', signal) : [],
   ]);
   signal?.throwIfAborted();
-  return { categoryRows, productRows, movementRows, salesRows, salesEnabled, readOnly };
+  return { categoryRows, productRows, movementRows, salesRows, salesEnabled, stockEnabled, readOnly };
 }
 
 export function mutateInventory(client, request) {
+  if (['stock_in', 'stock_out', 'stock_adjust'].includes(request.p_action)) return client.rpc('inventory_register_stock', {
+    p_request_id: request.p_request_id, p_product_id: request.p_product_id,
+    p_expected_version: request.p_expected_version, p_kind: request.p_action,
+    p_quantity: request.p_data.quantity, p_reason: request.p_data.reason,
+  });
   if (request.p_action === 'sale') return client.rpc('inventory_register_sale', {
     p_request_id: request.p_request_id, p_product_id: request.p_product_id,
     p_expected_version: request.p_expected_version,

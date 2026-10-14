@@ -1,0 +1,45 @@
+.workspace .selector { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(260px, 1.5fr); align-items: end; }
+.selector p { grid-column: 1 / -1; margin: 0; font-size: 11px; }
+.product { display: flex; align-items: center; gap: 18px; margin: 24px 0; border-radius: 14px; }
+.productIcon { display: grid; place-items: center; width: 52px; height: 52px; flex-shrink: 0; border-radius: 13px; color: var(--inventory-danger, #c52b3a); background: var(--inventory-accent-tint, #fff0f1); }
+.product h2 { font-size: 20px; font-weight: 700; margin: 5px 0; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.product p { margin: 0; overflow-wrap: anywhere; }
+.workspace .periodFilters { display: grid; grid-template-columns: 1fr 1fr 1.2fr 1.3fr auto; align-items: end; }
+.workspace .audit { flex-direction: row; gap: 9px; align-items: center; min-height: 44px; color: var(--inventory-ink, #202735); font-size: 12px; }
+.workspace .audit input { width: 17px; height: 17px; min-height: 17px; flex-shrink: 0; padding: 0; accent-color: #e32636; }
+.workspace .cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 18px 0; }
+.workspace .cards > article { padding: 20px; }
+.cardLabel { display: flex; align-items: center; }
+.cards article > span { font-size: 11px; display: block; line-height: 1.6; }
+.cards article strong { font-size: 28px; margin: 12px 0 8px; }
+.explanation { font-size: 12px; margin: 16px 0 24px; }
+.quality { padding: 18px 20px; margin: 22px 0; border: 1px solid color-mix(in srgb, var(--inventory-warning, #8a5d15) 25%, transparent); border-radius: 12px; background: var(--inventory-warning-tint, #fff7e7); color: var(--inventory-warning, #805414); }
+.quality h2 { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 700; margin: 0 0 10px; }
+.quality ul { list-style: disc; padding-left: 20px; margin: 0; font-size: 12px; line-height: 1.8; }
+.quality svg { flex-shrink: 0; }
+.table { min-width: 1260px; }
+.table :is(th, td):nth-child(n+3):nth-child(-n+6) { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.table td:first-child { white-space: nowrap; font-size: 11px; }
+.table td:nth-child(3) { color: var(--inventory-success, #23724b); }
+.table td:nth-child(4) { color: var(--inventory-danger, #bc2333); }
+.table td:nth-child(7) { min-width: 190px; max-width: 300px; overflow-wrap: anywhere; }
+.table td:nth-child(8), .table td:last-child { min-width: 150px; max-width: 240px; font-size: 11px; overflow-wrap: anywhere; color: var(--inventory-muted, #687182); }
+.empty { display: flex; align-items: center; flex-direction: column; gap: 12px; padding: 48px 24px; text-align: center; margin-top: 20px; }
+.empty > svg { color: var(--inventory-danger, #c52b3a); }
+.empty h2 { font-size: 18px; font-weight: 650; }
+.empty p { max-width: 540px; margin: 0; }
+@media (max-width: 1200px) {
+  .workspace .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .workspace .periodFilters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 800px) {
+  .workspace .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workspace .selector, .workspace .periodFilters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 540px) {
+  .workspace .selector, .workspace .periodFilters { grid-template-columns: minmax(0, 1fr); }
+  .workspace .cards { grid-template-columns: minmax(0, 1fr); }
+  .product { align-items: flex-start; padding: 18px; gap: 12px; }
+  .productIcon { width: 38px; height: 38px; border-radius: 10px; }
+  .product h2 { font-size: 18px; }
+}

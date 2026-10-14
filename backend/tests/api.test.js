@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createApi } from '../src/app.js';
-import { salePayload, mapSale, mapMovement, productPayload, catalogPayload, mapProduct } from '../src/modules/inventory/inventoryService.js';
+import { salePayload, stockPayload, mapSale, mapMovement, productPayload, catalogPayload, mapProduct } from '../src/modules/inventory/inventoryService.js';
 
 async function setup(t, options = {}) {
   const calls = [];
@@ -28,6 +28,7 @@ async function setup(t, options = {}) {
     mapProduct: value => value,
     mapMovement: value => value,
     salePayload,
+    stockPayload,
     mapSale,
     ...options.inventory,
   };
@@ -213,19 +214,39 @@ test('API rechaza orígenes externos, credenciales incorrectas y cambios inváli
   assert.equal(calls.length, 0);
 });
 
-test('API admite cantidades completas y rechaza movimientos inválidos antes de escribir', async t => {
+test('API mantiene adjust limitado a +1/-1 antes de escribir', async t => {
   const { request, login, calls } = await setup(t);
   const { cookie } = await login();
   const base = { requestId: '00000000-0000-4000-8000-000000000001', action: 'adjust', productId: 1, version: 2 };
-  for (const delta of [0, 1.5, '6', null, 2147483648, -2147483648]) {
+  for (const delta of [0, 1.5, '6', null, 6, -3, 2147483648, -2147483648]) {
     assert.equal((await request('/inventory/changes', { cookie, method: 'POST', body: { ...base, data: { delta } } })).status, 400);
   }
   assert.equal(calls.length, 0);
-  for (const delta of [6, -3]) {
+  for (const delta of [1, -1]) {
     assert.equal((await request('/inventory/changes', { cookie, method: 'POST', body: { ...base, data: { delta } } })).status, 200);
     assert.deepEqual(calls.at(-1).request.p_data, { delta });
     assert.equal(calls.at(-1).request.p_expected_version, 2);
   }
+});
+
+test('API valida stock, exige versión y bloquea RPC hasta aplicar migración', async t => {
+  let enabled = false;
+  const { request, login, calls } = await setup(t, { inventory: {
+    loadInventory: async () => ({ readOnly: false, stockEnabled: enabled, categories: [] }),
+  } });
+  const { cookie } = await login();
+  const post = body => request('/inventory/changes', { cookie, method: 'POST', body });
+  const body = { requestId: '00000000-0000-4000-8000-000000000051', action: 'stock_in', productId: 1, version: 2, data: { quantity: 6, reason: ' Compra ' } };
+  for (const invalid of [{ ...body, version: null }, ...[0, -1, 1.5, '6', null, 2147483648].map(quantity => ({ ...body, data: { ...body.data, quantity } })), { ...body, data: { quantity: 1, reason: ' ' } }]) assert.equal((await post(invalid)).status, 400);
+  assert.equal((await post(body)).status, 409);
+  assert.equal(calls.length, 0);
+  enabled = true;
+  for (const action of ['stock_in', 'stock_out', 'stock_adjust']) {
+    assert.equal((await post({ ...body, action })).status, 200);
+    assert.deepEqual(calls.at(-1).request.p_data, { quantity: 6, reason: 'Compra' });
+    assert.equal(calls.at(-1).request.p_expected_version, 2);
+  }
+  assert.equal((await post({ ...body, action: 'stock_adjust', data: { quantity: -3, reason: 'Conteo' } })).status, 200);
 });
 
 test('API conserva requestId y la incertidumbre de un reintento sin duplicar la intención', async t => {

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import ProductDetails from './ProductDetails';
 import styles from './ProductCatalog.module.css';
 
@@ -26,5 +27,6 @@ export default function ProductDetailsDialog({ product, onClose }) {
       <button ref={dismiss} type="button" onClick={onClose} aria-label="Cerrar ficha"><X size={18} aria-hidden="true" /> Cerrar</button>
     </div>
     <ProductDetails product={product} canReadPurchaseCost />
+    {product?.id != null && <div className={styles.kardexAction}><Link to={`/dashboard/kardex?producto=${encodeURIComponent(product.id)}`}>Consultar Kardex de este producto →</Link></div>}
   </dialog>;
 }

@@ -20,7 +20,7 @@ export default function ProductDetails({ product, canReadPurchaseCost = false })
       <Item label="Precio de venta">{currency(product.price)}</Item>
       {canReadPurchaseCost && <Item label="Costo de compra referencial">{currency(product.purchaseCost)}</Item>}
       <Item label="Unidad de medida">{product.unitOfMeasure || 'Unidad'}</Item></dl></section>
-    <section><h3>Inventario</h3><dl className={styles.grid}>
+    <section className={styles.inventoryFacts}><h3>Inventario</h3><dl className={styles.grid}>
       <Item label="Stock actual">{product.stock}</Item><Item label="Stock mínimo">{product.minStock}</Item>
       <Item label="Disponibilidad">{catalogAvailability(product)}</Item></dl>
       <p>Consulta de existencias. La ficha no modifica cantidades.</p></section>
