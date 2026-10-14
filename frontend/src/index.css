@@ -15,9 +15,6 @@ body {
 .sidebar-footer { position: relative; }
 .dashboard-heading { flex-wrap: wrap; gap: 16px; }
 .dashboard-page > div > [role="link"] { min-width: 0; }
-.dashboard-mini { flex-wrap: wrap; }
-.dashboard-mini > div:nth-child(2) { flex-basis: 160px !important; }
-.dashboard-mini > div:last-child { flex-shrink: 0; }
 
 @container (max-width: 1000px) {
   .dashboard-bottom { grid-template-columns: minmax(0, 1fr) !important; }
@@ -136,7 +133,6 @@ body {
   .header-stats { width: 100%; border: 0 !important; padding: 0 !important; flex-wrap: wrap; }
   .inventory-main > div { padding: 20px 16px !important; }
   .dashboard-heading h1 { font-size: 26px !important; }
-  .dashboard-mini > div:last-child { max-width: 100% !important; }
 }
 
 /* Color overrides only: existing inventory dimensions and layout are preserved. */

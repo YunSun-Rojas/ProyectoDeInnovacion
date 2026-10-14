@@ -1,0 +1,7 @@
+.chart { height: 280px; min-width: 0; width: 100%; }
+.tooltip { min-width: 190px; max-width: 260px; padding: 12px; border: 1px solid var(--inventory-border, #e5e7eb); border-radius: 10px; background: var(--inventory-surface, #fff); color: var(--inventory-ink, #182230); box-shadow: 0 8px 24px #0002; font-size: 12px; }
+.date { display: block; padding-bottom: 9px; margin-bottom: 10px; border-bottom: 1px solid var(--inventory-border, #e5e7eb); font-weight: 600; }
+.row { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+.row i { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+.row span { flex: 1; color: var(--inventory-muted, #667085); }
+.row strong { font-weight: 600; font-variant-numeric: tabular-nums; }

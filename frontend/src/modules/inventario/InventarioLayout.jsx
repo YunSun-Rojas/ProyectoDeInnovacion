@@ -1,16 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
+import { DATE_RANGES, limaDate, periodRange, summarizeMovements } from './pages/dashboardData';
+import { summarizeSales } from './pages/salesData';
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import { useInventory } from "./hooks/useInventory";
 import s from "./pages/Management.module.css";
+import ui from './pages/InventoryUI.module.css';
 
 export default function InventarioLayout({ userId }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
   const activePage = pathname.split("/")[2] || "dashboard";
+  const inventoryFeedback = ['productos', 'existencias', 'movimientos', 'kardex'].includes(activePage);
+  const contentRef = useRef(null);
+  const entranceRef = useRef(null);
+  useLayoutEffect(() => {
+    // Reinicia la misma animación CSS antes de pintar, sin remontar el contenido.
+    const animation = contentRef.current?.getAnimations()[0];
+    if (animation) entranceRef.current = animation;
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches && entranceRef.current) {
+      entranceRef.current.currentTime = 0;
+      entranceRef.current.play();
+    }
+  }, [activePage]);
 
   const setActivePage = (page) => {
     navigate(
@@ -29,6 +44,12 @@ export default function InventarioLayout({ userId }) {
     error,
     retry,
   } = inventory;
+
+  const [selectedRange, setSelectedRange] = useState('month');
+  const today = limaDate(new Date());
+  const rangeConfig = DATE_RANGES.find(range => range.id === selectedRange) || DATE_RANGES.find(range => range.id === 'month');
+  const activity = useMemo(() => summarizeMovements(inventory.movements, periodRange(selectedRange, today)), [inventory.movements, selectedRange, today]);
+  const salesSummary = useMemo(() => summarizeSales(inventory.sales, periodRange(selectedRange, today)), [inventory.sales, selectedRange, today]);
 
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
@@ -142,10 +163,18 @@ export default function InventarioLayout({ userId }) {
         <Header
           products={products}
           inventoryReady={status === "ready"}
+          selectedRange={selectedRange}
+          onRangeChange={setSelectedRange}
+          activity={activity}
+          salesSummary={salesSummary}
+          salesEnabled={inventory.salesEnabled}
+          historyAvailable={!inventory.readOnly}
         />
 
         <main
-          className="inventory-main"
+          ref={contentRef}
+          className={`inventory-main ${ui.viewEntrance}${inventoryFeedback ? ` ${ui.inventoryFeedback}` : ''}`}
+          data-inventory-view={activePage}
           style={{
             flex: 1,
             minHeight: 0,
@@ -156,6 +185,9 @@ export default function InventarioLayout({ userId }) {
             <Outlet
               context={{
                 ...inventory,
+                activity,
+                salesSummary,
+                rangeLabel: rangeConfig.label,
                 products,
                 categories,
                 settings,
