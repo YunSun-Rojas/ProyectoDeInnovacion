@@ -2,6 +2,36 @@ import { readBody, fail } from '../../utils/http.js';
 
 export function createInventoryController(inventory) {
   return {
+    async reports({ session: { client, user }, send }) {
+      send(200, await inventory.loadReports(client, user.id));
+    },
+    async alerts({ session: { client, user }, send }) {
+      send(200, await inventory.loadPendingDifferences(client, user.id));
+    },
+    async physicalList({ session: { client }, send }) {
+      const sessions = [];
+      let response;
+      do {
+        response = await client.from('inventory_counts').select('*', { count: 'exact' })
+          .order('created_at', { ascending: false }).order('id').range(sessions.length, sessions.length + 499);
+        physicalError(response.error);
+        if (!Array.isArray(response.data) || !Number.isInteger(response.count) || (!response.data.length && sessions.length < response.count))
+          throw fail(503, 'No se pudo cargar el historial completo. Reintenta.');
+        sessions.push(...response.data);
+      } while (sessions.length < response.count);
+      send(200, { sessions });
+    },
+    async physical({ req, session: { client }, send }) {
+      const body = await readBody(req);
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.id)
+        || !['get','create','save','review','reopen','rebase','confirm','cancel'].includes(body.action)
+        || (body.revision != null && (!Number.isInteger(body.revision) || body.revision < 1 || body.revision > 2147483647))
+        || (body.data != null && (typeof body.data !== 'object' || Array.isArray(body.data)))) throw fail(400, 'Solicitud inválida.');
+      const response = await client.rpc('inventory_physical', { p_action: body.action, p_id: body.id,
+        p_revision: body.revision ?? null, p_data: body.data ?? {} });
+      physicalError(response.error);
+      send(200, response.data);
+    },
     async load({ session: { client, user }, send }) {
       send(200, await inventory.loadInventory(client, user.id));
     },
@@ -40,4 +70,23 @@ export function createInventoryController(inventory) {
       } catch { throw Object.assign(fail(503, 'Cambio enviado. Reintenta para confirmar sin duplicarlo.'), { uncertain: true }); }
     },
   };
+}
+
+function physicalError(error) {
+  if (!error) return;
+  if (['42P01','PGRST205','PGRST202','42883'].includes(error.code))
+    throw fail(409, 'Inventario físico requiere habilitación de base de datos: aplicar el SQL propuesto de Fase 5 con autorización.');
+  if (error.code === '42501' || error.message?.includes('FORBIDDEN')) throw fail(403, 'Tu cuenta no tiene permiso para esta sesión.');
+  const messages = { PHYSICAL_STALE_REVISION: 'La sesión cambió. Vuelve a abrirla antes de guardar.',
+    PHYSICAL_EMPTY: 'No hay productos para crear o confirmar este conteo.',
+    PHYSICAL_INCOMPLETE: 'Cuenta todos los productos y explica cada diferencia.',
+    PHYSICAL_PRODUCT_REMOVED: 'Un producto fue eliminado. Cancela este conteo y crea otro.',
+    PHYSICAL_IMMUTABLE: 'Esta sesión está cerrada y no admite cambios.',
+    PHYSICAL_REVIEW_REQUIRED: 'Primero envía la sesión a revisión.' };
+  const known = Object.entries(messages).find(([key]) => error.message?.includes(key))?.[1];
+  if (known || error.message?.includes('INVENTORY_') || ['22003','22023','23514','22P02'].includes(error.code))
+    throw fail(409, known || 'No se pudo completar el conteo. Recarga la sesión y revisa los datos.');
+  if (['40001','40P01','55P03','57014'].includes(error.code))
+    throw fail(409, 'La transacción se revirtió por concurrencia o tiempo de espera. Recarga la sesión y reintenta.');
+  throw Object.assign(fail(503, 'No se pudo confirmar el resultado. Reintenta la misma operación.'), { uncertain: true });
 }

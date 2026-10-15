@@ -155,7 +155,7 @@ export default function Dashboard({
         <div className={s.insights} aria-label="Avisos del inventario">
           {summary.empty > 0 && (
             <div className={s.dangerInsight}>
-              <span aria-hidden="true">🚨</span>
+              <span aria-hidden="true">⚠️</span>
               <span>
                 {summary.empty} producto
                 {summary.empty === 1 ? '' : 's'} sin stock.

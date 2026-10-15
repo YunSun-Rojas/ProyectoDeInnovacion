@@ -14,7 +14,7 @@ export default function InventarioLayout({ userId }) {
   const { pathname } = useLocation();
 
   const activePage = pathname.split("/")[2] || "dashboard";
-  const inventoryFeedback = ['productos', 'existencias', 'movimientos', 'kardex'].includes(activePage);
+  const inventoryFeedback = ['productos', 'existencias', 'movimientos', 'kardex', 'inventario-fisico', 'alertas', 'reportes'].includes(activePage);
   const contentRef = useRef(null);
   const entranceRef = useRef(null);
   useLayoutEffect(() => {

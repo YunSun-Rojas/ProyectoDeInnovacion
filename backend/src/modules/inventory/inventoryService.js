@@ -1,5 +1,11 @@
-import { readInventory, mutateInventory } from './inventoryRepository.js';
+import { readInventory, mutateInventory, readReportCounts } from './inventoryRepository.js';
+export { readPendingDifferences as loadPendingDifferences } from './inventoryRepository.js';
 import { catalogPatch, money } from '../../../../shared/catalogProduct.js';
+
+export async function loadReports(client, userId) {
+  const [inventory, physical] = await Promise.all([loadInventory(client, userId), readReportCounts(client, userId)]);
+  return { ...inventory, physical, consultedAt: new Date().toISOString() };
+}
 
 export async function loadInventory(client, userId, signal) {
   if (!client) {

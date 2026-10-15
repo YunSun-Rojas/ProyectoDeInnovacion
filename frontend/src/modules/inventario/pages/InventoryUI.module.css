@@ -236,3 +236,7 @@
   .viewEntrance, .workspace *, .compactDialog, .compactDialog *, .inventoryFeedback [aria-busy='true'] > [role='status']::before { animation: none !important; transition: none !important; }
   .summary > article:hover, .summary > div:hover, .workspace :global(.inv-stat:hover), .workspace .primary:hover:not(:disabled), .workspace :global(.inv-primary:hover:not(:disabled)) { transform: none; }
 }
+
+.viewEntrance[data-inventory-view="inventario-fisico"] { animation-duration: 380ms; }
+.viewEntrance[data-inventory-view="alertas"] { animation-duration: 380ms; }
+.viewEntrance[data-inventory-view="reportes"] { animation-duration: 380ms; }

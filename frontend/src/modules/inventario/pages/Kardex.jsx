@@ -81,7 +81,6 @@ export default function Kardex() {
               ['Saldo final del período', ledger.closing, Scale, ledger.closing == null ? 'No reconstruible con certeza' : 'Tras las operaciones del período'],
             ].map(([label, value, Icon, detail]) => <article key={label}><div className={k.cardLabel}><Icon size={18} aria-hidden="true" />{label}</div><strong>{integer(value)}</strong><span className={s.muted}>{detail}</span></article>)}
           </section>
-          <p className={`${s.muted} ${k.explanation}`}>Las tarjetas incluyen todos los tipos del período. El filtro de tipo y la opción de auditoría solo cambian la tabla y el CSV. Los totales abarcan todas las páginas; las variaciones cero no suman unidades.</p>
           {ledger.warnings.length > 0 && <aside className={k.quality} aria-label="Observaciones sobre el historial"><h2><AlertTriangle size={18} aria-hidden="true" />Historial con limitaciones</h2><ul>{ledger.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></aside>}
           <p className={s.muted} role="status">{ledger.rows.length} registros encontrados · Orden cronológico: del más antiguo al más reciente.</p>
           <p className={ui.tableHint}>Desliza la tabla para consultar todas las columnas.</p>

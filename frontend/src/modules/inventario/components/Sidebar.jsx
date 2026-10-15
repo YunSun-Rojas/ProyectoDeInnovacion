@@ -14,21 +14,29 @@ import {
   LogOut,
   Package,
   BookOpen,
+  Bell,
+  ChartNoAxesCombined,
+  ClipboardList,
 } from "lucide-react";
 
 const NAV_GROUPS = [
-  { label: 'INICIO', items: [{ id: 'dashboard', label: 'Panel de control', icon: LayoutGrid }] },
+  { label: 'PRINCIPAL', items: [{ id: 'dashboard', label: 'Panel de control', icon: LayoutGrid }] },
   { label: 'CATÁLOGO', items: [{ id: 'productos', label: 'Productos', icon: Boxes }] },
-  { label: 'ALMACÉN', items: [
+  { label: 'INVENTARIO Y OPERACIONES', items: [
     { id: 'existencias', label: 'Existencias', icon: Package },
     { id: 'movimientos', label: 'Movimientos', icon: History },
     { id: 'kardex', label: 'Kardex', icon: BookOpen },
+    { id: 'inventario-fisico', label: 'Inventario físico', icon: ClipboardList },
+  ] },
+  { label: 'CONTROL Y ANÁLISIS', items: [
+    { id: 'alertas', label: 'Alertas y notificaciones', icon: Bell },
+    { id: 'reportes', label: 'Reportes e indicadores', icon: ChartNoAxesCombined },
   ] },
   { label: 'INTELIGENCIA ARTIFICIAL', items: [
     { id: 'prediccion', label: 'Predicción de demanda', icon: TrendingUp },
     { id: 'vision', label: 'Reconocimiento visual', icon: Eye },
   ] },
-  { label: 'SISTEMA', items: [{ id: 'configuracion', label: 'Configuración', icon: Settings }] },
+  { label: 'ADMINISTRACIÓN', items: [{ id: 'configuracion', label: 'Configuración', icon: Settings }] },
 ];
 
 export default function Sidebar({ activePage, setActivePage }) {
@@ -65,28 +73,10 @@ export default function Sidebar({ activePage, setActivePage }) {
     }
   };
 
-  const navigationStyle = (isActive) => ({
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    width: "100%",
-    padding: "11px 12px",
-    borderRadius: 8,
-    border: "none",
-    background: isActive ? "#FFFFFF" : "transparent",
-    color: isActive ? "#E71950" : "#FFFFFF",
-    fontFamily: "Inter, system-ui, sans-serif",
-    fontSize: 13,
-    fontWeight: isActive ? 650 : 500,
-    cursor: "pointer",
-    transition: "background 0.2s ease",
-    textAlign: "left",
-  });
-
   return (
     <>
       <aside
-        className="inventory-sidebar"
+        className={`inventory-sidebar ${s.sidebar}`}
         style={{
           width: 220,
           background: "#E71950",
@@ -151,11 +141,11 @@ export default function Sidebar({ activePage, setActivePage }) {
 
         {/* Navegación */}
         <nav
+          className={s.navigation}
           aria-label="Navegación principal"
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 5,
             flex: 1,
             minHeight: 0,
             overflowY: "auto",
@@ -165,10 +155,10 @@ export default function Sidebar({ activePage, setActivePage }) {
         >
           {NAV_GROUPS.map(group => <section className={s.group} key={group.label} aria-label={group.label}>
             <h2 className={s.heading}>{group.label}</h2>
-            {group.items.map(({ id, label, icon: Icon }) => <button key={id} type="button"
+            {group.items.map(({ id, label, icon: Icon }) => <button key={id} type="button" className={s.item}
               aria-label={label} title={label} aria-current={activePage === id ? 'page' : undefined}
-              onClick={() => setActivePage(id)} style={navigationStyle(activePage === id)}>
-              <Icon size={17} aria-hidden="true" /><span className="sidebar-label">{label}</span>
+              onClick={() => setActivePage(id)}>
+              <Icon size={17} strokeWidth={1.75} aria-hidden="true" /><span className="sidebar-label">{label}</span>
             </button>)}
           </section>)}        </nav>
 
@@ -182,6 +172,7 @@ export default function Sidebar({ activePage, setActivePage }) {
           }}
         >
           <button
+            className={s.item}
             type="button"
             disabled={loggingOut}
             aria-label="Cerrar sesión"
@@ -197,12 +188,11 @@ export default function Sidebar({ activePage, setActivePage }) {
               setShowLogoutDialog(true);
             }}
             style={{
-              ...navigationStyle(false),
               opacity: loggingOut ? 0.6 : 1,
               cursor: loggingOut ? "wait" : "pointer",
             }}
           >
-            <LogOut size={17} />
+            <LogOut size={17} strokeWidth={1.75} aria-hidden="true" />
             <span className="sidebar-label">
               {loggingOut ? "Cerrando sesión…" : "Cerrar sesión"}
             </span>

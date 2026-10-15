@@ -1,5 +1,63 @@
 const PAGE_SIZE = 500;
 
+export async function readReportCounts(client, userId) {
+  const member = await client.from('inventory_members').select('user_id').eq('user_id', userId).maybeSingle();
+  if (member.error || !member.data) throw Object.assign(new Error('No se pudo autorizar la consulta de conteos.'), { status: member.error && member.error.code !== '42501' ? 503 : 403 });
+  const read = async (table, columns, order) => {
+    const rows = [];
+    let response;
+    do {
+      let query = client.from(table).select(columns, { count: 'exact' });
+      for (const column of order) query = query.order(column);
+      response = await query.range(rows.length, rows.length + PAGE_SIZE - 1);
+      if (['42P01','PGRST205'].includes(response.error?.code)) return null;
+      if (response.error || !Array.isArray(response.data) || !Number.isInteger(response.count) || (!response.data.length && rows.length < response.count))
+        throw Object.assign(new Error('No se pudo consultar el historial completo de conteos. Revisa la conexión y los permisos.'), { status: response.error?.code === '42501' ? 403 : 503 });
+      rows.push(...response.data);
+    } while (rows.length < response.count);
+    return rows;
+  };
+  const sessions = await read('inventory_counts','id,status,created_at,finalized_at,actor_email',['id']);
+  if (sessions === null) return { enabled: false, sessions: [], lines: [] };
+  const lines = await read('inventory_count_lines','session_id,product_id,sku,product_name,reference_stock,physical_quantity,reason',['session_id','product_id']);
+  return lines === null ? { enabled: false, sessions: [], lines: [] } : { enabled: true, sessions, lines };
+}
+
+// Solo lectura; no usa la RPC transaccional de conteos ni altera sus estados.
+export async function readPendingDifferences(client, userId) {
+  const membership = await client.from('inventory_members').select('user_id').eq('user_id', userId).maybeSingle();
+  if (membership.error) throw Object.assign(new Error('No se pudieron verificar los permisos de alertas. Reintenta.'),
+    { status: membership.error.code === '42501' ? 403 : 503 });
+  if (!membership.data) {
+    throw Object.assign(new Error('Tu cuenta no pudo autorizar la consulta de alertas.'), { status: 403 });
+  }
+  const check = response => {
+    if (response.error) throw Object.assign(new Error('No se pudieron consultar las diferencias pendientes. Revisa tu conexión y permisos.'),
+      { status: response.error.code === '42501' ? 403 : 503 });
+    if (!Array.isArray(response.data) || !Number.isInteger(response.count)) throw Object.assign(new Error('Respuesta incompleta de diferencias pendientes.'), { status: 503 });
+  };
+  const sessions = new Map();
+  const rows = [];
+  let response;
+  do {
+    // FK de Fase 5: estado y cantidades se leen juntos, sin una consulta por sesión.
+    response = await client.from('inventory_count_lines')
+      .select('session_id,product_id,sku,product_name,reference_stock,physical_quantity,inventory_counts!inner(id,status,created_at,actor_email)', { count: 'exact' })
+      .in('inventory_counts.status', ['borrador', 'en revisión'])
+      .order('session_id').order('product_id').range(rows.length, rows.length + PAGE_SIZE - 1);
+    if (['42P01', 'PGRST205', 'PGRST200'].includes(response.error?.code)) return { enabled: false, sessions: [], lines: [] };
+    check(response);
+    if (!response.data.length && rows.length < response.count) throw Object.assign(new Error('Detalle de conteos incompleto. Reintenta.'), { status: 503 });
+    rows.push(...response.data);
+  } while (rows.length < response.count);
+  const lines = rows.flatMap(({ inventory_counts: session, ...line }) => {
+    if (!session || !['borrador', 'en revisión'].includes(session.status)) return [];
+    sessions.set(session.id, session);
+    return line.physical_quantity !== null && line.physical_quantity !== line.reference_stock ? [line] : [];
+  });
+  return { enabled: true, sessions: [...sessions.values()], lines };
+}
+
 function checkResponse({ error }) {
   if (!error) return;
 

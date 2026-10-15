@@ -1,3 +1,6 @@
+import InventarioFisico from './modules/inventario/pages/InventarioFisico';
+import Alertas from './modules/inventario/pages/Alertas';
+import Reportes from './modules/inventario/pages/Reportes';
 import { Routes, Route, Navigate, useOutletContext, useLocation } from "react-router-dom";
 import { LoginPage } from "./modules/auth/pages/LoginPage";
 import InventarioLayout from "./modules/inventario/InventarioLayout";
@@ -48,6 +51,9 @@ export default function App() {
         <Route path="vision" element={<Vision />} />
         <Route path="existencias" element={<Existencias />} />
         <Route path="movimientos" element={<Historial />} />
+        <Route path="inventario-fisico" element={<InventarioFisico />} />
+        <Route path="alertas" element={<Alertas />} />
+        <Route path="reportes" element={<Reportes />} />
         <Route path="kardex" element={<Kardex />} />
         <Route path="historial" element={<HistorialRedirect />} />
         <Route path="configuracion" element={<Config />} />

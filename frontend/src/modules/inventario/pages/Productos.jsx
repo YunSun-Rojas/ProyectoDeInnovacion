@@ -983,7 +983,6 @@ export default function Productos({
         <div>
           <span className="inv-eyebrow">CATÁLOGO</span>
           <h1>Catálogo de productos</h1>
-          <p>Organiza tus productos y consulta cada referencia del inventario.</p>
         </div>
 
         <div className="inv-actions">
@@ -1463,7 +1462,6 @@ function ProductModal({
           onClick={onClose}
         >
           <X size={18} />
-          Cerrar
         </button>
       </div>
 

@@ -1,97 +1,81 @@
-import { useState } from "react";
-import { Eye, Camera, CheckCircle2, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from 'react';
+import { Eye, ImagePlus, RefreshCw, ScanLine } from 'lucide-react';
+import { api } from '../../../api/httpClient';
+import { visionFileError, visionDimensionsError } from './visionData';
+import s from './Management.module.css';
+import ui from './InventoryUI.module.css';
+import styles from './Vision.module.css';
 
 export default function Vision() {
-  const [scanning, setScanning] = useState(false);
-  const [result, setResult] = useState(null);
-
-  const handleSimulateScan = () => {
-    setScanning(true);
-    setResult(null);
-    setTimeout(() => {
-      setScanning(false);
-      setResult({
-        name: "Nvidia RTX 4070 Ti",
-        confidence: "98.4%",
-        detectedQty: 3
-      });
-    }, 2000);
-  };
-
-  return (
-    <div style={{ padding: "32px 40px", background: "var(--inventory-bg, #F1F5F9)", minHeight: "100vh" }}>
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ margin: 0, fontFamily: "Oswald, sans-serif", fontSize: 32, fontWeight: 700, color: "var(--inventory-ink, #17171A)" }}>
-          Reconocimiento visual
-        </h1>
-        <p style={{ margin: "4px 0 0", fontFamily: "Inter, sans-serif", fontSize: 14, color: "var(--inventory-muted, #6E6C68)" }}>
-          Demostración de reconocimiento visual. No está conectada a YOLO ni modifica las existencias.
-        </p>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap: 24 }}>
-        {/* Área de Cámara / Carga */}
-        <div style={{ background: "var(--inventory-surface, #FFF)", border: "2px dashed var(--inventory-border, #E5E7EB)", borderRadius: 12, padding: 40, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-          <Camera size={48} color="var(--inventory-muted, #6E6C68)" style={{ marginBottom: 16 }} />
-          <h3 style={{ margin: 0, fontFamily: "Inter, sans-serif", fontSize: 16 }}>Vista previa de reconocimiento</h3>
-          <p style={{ fontSize: 13, color: "var(--inventory-muted, #6E6C68)", marginBottom: 20 }}>Pulsa el botón para ver un resultado simulado; no se utiliza la cámara ni se procesa una imagen real.</p>
-
-          <button
-            onClick={handleSimulateScan}
-            disabled={scanning}
-            style={{
-              background: "#17171A",
-              color: "#FFF",
-              border: "none",
-              padding: "12px 24px",
-              borderRadius: 8,
-              fontWeight: 600,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 8
-            }}
-          >
-            {scanning ? <RefreshCw className="animate-spin" size={18} /> : <Eye size={18} />}
-            {scanning ? "Simulando análisis..." : "Simular reconocimiento"}
-          </button>
-        </div>
-
-        {/* Resultado de la Detección */}
-        <div style={{ background: "var(--inventory-surface, #FFF)", border: "1px solid var(--inventory-border, #E5E7EB)", borderRadius: 12, padding: 28 }}>
-          <h3 style={{ margin: "0 0 20px 0", fontFamily: "Inter, sans-serif", fontSize: 18 }}>Resultado demostrativo</h3>
-
-          {result ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--inventory-success, #2F7D4F)", background: "var(--inventory-success-tint, #E4F2E9)", padding: "10px 14px", borderRadius: 8, fontWeight: 600, fontSize: 14 }}>
-                <CheckCircle2 size={18} /> Ejemplo de identificación (simulado)
-              </div>
-
-              <div>
-                <span style={{ fontSize: 12, color: "var(--inventory-muted, #6E6C68)", display: "block" }}>Producto de ejemplo</span>
-                <span style={{ fontSize: 18, fontWeight: 600, color: "var(--inventory-ink, #17171A)" }}>{result.name}</span>
-              </div>
-
-              <div style={{ display: "flex", gap: 20 }}>
-                <div>
-                  <span style={{ fontSize: 12, color: "var(--inventory-muted, #6E6C68)", display: "block" }}>Confianza simulada</span>
-                  <span style={{ fontSize: 16, fontWeight: 600, color: "var(--inventory-ink, #17171A)" }}>{result.confidence}</span>
-                </div>
-                <div>
-                  <span style={{ fontSize: 12, color: "var(--inventory-muted, #6E6C68)", display: "block" }}>Cantidad simulada</span>
-                  <span style={{ fontSize: 16, fontWeight: 600, color: "#D62839" }}>{result.detectedQty} unids.</span>
-                </div>
-              </div>
-
-              <button disabled title="Disponible cuando se integre el reconocimiento real" style={{ marginTop: 10, background: "#D62839", color: "#FFF", border: "none", padding: "12px", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>
-                Ingreso de stock no disponible en demostración
-              </button>
-            </div>
-          ) : (
-            <p style={{ color: "var(--inventory-muted, #6E6C68)", fontSize: 14 }}>Inicia la demostración para ver un ejemplo de resultado.</p>
-          )}
-        </div>
-      </div>
+  const [file,setFile]=useState(null);
+  const [preview,setPreview]=useState('');
+  const [imageReady,setImageReady]=useState(false);
+  const [model,setModel]=useState(null);
+  const [modelError,setModelError]=useState('');
+  const [checking,setChecking]=useState(true);
+  const [attempt,setAttempt]=useState(0);
+  const [error,setError]=useState('');
+  const [scanning,setScanning]=useState(false);
+  const [result,setResult]=useState(null);
+  const request=useRef(null);
+  const lock=useRef(false);
+  useEffect(()=>{
+    const controller=new AbortController();
+    api('/vision/model',{signal:controller.signal}).then(data=>{
+      if(!controller.signal.aborted){setModel(data);setChecking(false);}
+    }).catch(e=>{if(!controller.signal.aborted){setModelError(e.message);setChecking(false);}});
+    return()=>controller.abort();
+  },[attempt]);
+  useEffect(()=>{
+    return()=>{if(preview)URL.revokeObjectURL(preview);};
+  },[preview]);
+  useEffect(()=>()=>{const controller=request.current;request.current=null;controller?.abort();},[]);
+  function select(event){
+    const selected=event.target.files?.[0];
+    if(!selected)return;
+    const issue=visionFileError(selected);
+    setResult(null);setImageReady(false);setError(issue);setPreview(issue?'':URL.createObjectURL(selected));
+    setFile(issue?null:selected);
+    event.target.value='';
+  }
+  async function analyze(){
+    if(lock.current||!imageReady||!file||!model)return;
+    lock.current=true;setScanning(true);setError('');setResult(null);
+    const controller=new AbortController();request.current=controller;
+    const timer=setTimeout(()=>controller.abort(),55000);
+    try{
+      const data=await api('/vision/detect',{method:'POST',rawBody:file,signal:controller.signal});
+      if(!controller.signal.aborted)setResult(data);
+    }catch(e){if(request.current===controller)setError(e.name==='AbortError'?'El análisis fue cancelado o excedió el tiempo permitido. Reintenta.':e.message);}
+    finally{clearTimeout(timer);lock.current=false;if(request.current===controller){setScanning(false);request.current=null;}}
+  }
+  return <div className={`${s.page} ${ui.workspace}`}>
+    <header className={`${s.header} ${ui.heading}`}><div><span className={ui.eyebrow}>INTELIGENCIA ARTIFICIAL · MODELO ENTRENADO</span><h1>Reconocimiento visual</h1><p className={s.muted}>Analiza una imagen con monitores_v1/best.pt. Las detecciones no modifican el inventario.</p></div></header>
+    <section className={ui.notice} aria-label="Estado del modelo"><ScanLine size={19} aria-hidden="true" /><div>{model?<><strong>Modelo conectado · {model.model}</strong><p className={styles.modelText}>Clases reales: {model.classes.map(c=>c.name).join(', ')} · Umbral de confianza: {Math.round(model.confidenceThreshold*100)} % · Entrada YOLO: {model.imageSize} px</p><span>Solo reconoce las clases aprendidas; no identifica automáticamente todas las categorías ni SKU del catálogo.</span></>:<span role="status">{checking?'Comprobando el servicio local…':'Modelo no conectado.'}</span>}</div><button type="button" className={ui.secondary} disabled={checking||scanning} onClick={()=>{setChecking(true);setModel(null);setModelError('');setAttempt(n=>n+1);}}>Comprobar modelo</button></section>
+    {modelError&&<p className={ui.alert} role="alert">{modelError}</p>}
+    <div className={styles.grid}>
+      <section className={`${s.card} ${styles.upload}`} aria-label="Imagen de entrada">
+        <h2 className={styles.title}>Imagen de entrada</h2>
+        <label className={s.field}><span><ImagePlus size={17} aria-hidden="true" /> Seleccionar imagen</span><input type="file" accept="image/jpeg,image/png,image/webp" disabled={scanning} onChange={select} aria-describedby="vision-file-help" /></label>
+        <p id="vision-file-help" className={styles.help}>JPG, PNG o WebP · Hasta 8 MiB y 16 MP · Entre 32 y 8192 px por lado. Se procesa en memoria, sin guardar la imagen en el servidor.</p>
+        {preview?<div className={styles.imageSurface}><div className={styles.imageFrame}><img src={preview} alt={`Imagen seleccionada: ${file?.name||''}`} onLoad={e=>{
+          const issue=visionDimensionsError(e.currentTarget.naturalWidth,e.currentTarget.naturalHeight);setError(issue);setImageReady(!issue);
+        }} onError={()=>{setImageReady(false);setError('No se pudo abrir la imagen. Selecciona un archivo válido.');}} />
+          {result&&<svg className={styles.overlay} viewBox={`0 0 ${result.width} ${result.height}`} role="img" aria-label={`${result.detections.length} detecciones sobre la imagen`}>
+            {result.detections.map((d,index)=>{const [x1,y1,x2,y2]=d.box;const fontSize=Math.max(12,result.width/45);return <g key={index}><title>{`${d.className}: ${(d.confidence*100).toFixed(1)} %`}</title><rect x={x1} y={y1} width={x2-x1} height={y2-y1} fill="none" stroke="#ff3153" strokeWidth="2" vectorEffect="non-scaling-stroke" /><text x={x1+3} y={Math.max(fontSize+2,y1-5)} fontSize={fontSize} fill="white" stroke="#8a1029" strokeWidth="3" paintOrder="stroke" strokeLinejoin="round">{index+1} · {d.className} {(d.confidence*100).toFixed(1)}%</text></g>;})}
+          </svg>}
+        </div></div>:<div className={styles.placeholder}><ImagePlus size={40} aria-hidden="true" /><p>Selecciona una imagen para ver su vista previa.</p></div>}
+        <button type="button" className={ui.primary} disabled={scanning||!model||!imageReady} onClick={analyze}>{scanning?<RefreshCw size={17} aria-hidden="true" />:<Eye size={17} aria-hidden="true" />}{scanning?'Analizando imagen…':'Analizar imagen'}</button>
+        {error&&<p className={ui.alert} role="alert">{error}</p>}
+      </section>
+      <section className={s.card} aria-busy={scanning} aria-label="Resultado real del reconocimiento"><h2 className={styles.title}>Detecciones</h2>
+        {scanning?<p role="status" className={ui.notice}>Ejecutando el modelo entrenado en Python…</p>:result?<>
+          <p className={ui.notice} role="status">{result.detections.length?`${result.detections.length} detecciones reales`:'No se encontraron detecciones por encima del umbral de confianza.'}</p>
+          <p className={styles.help}>{result.width} × {result.height} px · Inferencia: {result.elapsedMs} ms · {result.model}</p>
+          <div className={`${s.tableWrap} ${ui.tableSurface}`}><table className={s.table}><caption className={styles.caption}>Coordenadas en píxeles de la imagen orientada, no del tamaño de pantalla.</caption><thead><tr><th scope="col">Clase</th><th scope="col">Confianza</th><th scope="col">Caja (x1, y1, x2, y2)</th></tr></thead><tbody>{result.detections.map((d,i)=><tr key={i}><td>{i+1}. {d.className}</td><td>{(d.confidence*100).toFixed(1)} %</td><td>{d.box.map(n=>n.toFixed(1)).join(', ')}</td></tr>)}</tbody></table></div>
+          <p className={styles.help}>Puedes seleccionar otra imagen o repetir el análisis. No se registran productos, existencias ni movimientos.</p>
+        </>:<p className={s.muted}>Selecciona una imagen y pulsa «Analizar imagen» para obtener el resultado del modelo real.</p>}
+      </section>
     </div>
-  );
+  </div>;
 }

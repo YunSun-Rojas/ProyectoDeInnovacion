@@ -8,11 +8,14 @@ import { createInventoryController } from './modules/inventory/inventoryControll
 import { createInventoryRoutes } from './modules/inventory/inventoryRoutes.js';
 import { createAuthMiddleware } from './middleware/authMiddleware.js';
 import { checkOrigin, fail } from './utils/http.js';
+import { createVisionService } from './modules/vision/visionService.js';
 
-export function createApi(config, { clientFactory = () => createSupabaseClient(config), inventory = inventoryService } = {}) {
+export function createApi(config, { clientFactory = () => createSupabaseClient(config), inventory = inventoryService, vision = createVisionService() } = {}) {
   const authService = createAuthService(config, clientFactory);
   const authenticate = createAuthMiddleware(authService);
   const routes = [
+    { method: 'GET', path: '/api/vision/model', handler: async ({send}) => send(200,await vision.info()) },
+    { method: 'POST', path: '/api/vision/detect', handler: async ({req,res,send}) => { res.setHeader('Connection','close'); send(200,await vision.detect(req)); } },
     ...createAuthRoutes(createAuthController(authService)),
     ...createInventoryRoutes(createInventoryController(inventory)),
   ];
