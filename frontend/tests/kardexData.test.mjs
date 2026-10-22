@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildKardex, kardexProducts, kardexPage, kardexCsv, compareMovements } from '../src/modules/inventario/pages/kardexData.js';
+import { buildKardex, kardexProducts, kardexPage, kardexCsv, compareMovements, kardexToday, limaDay } from '../src/modules/inventario/pages/kardexData.js';
 
 const product = { id: 1, name: 'Mouse actual', sku: 'NUEVO', stock: 14 };
 const row = (id, type, before, after, day, extra = {}) => ({ id, productId: 1, product: 'Mouse', sku: 'ANTIGUO',
@@ -8,6 +8,22 @@ const row = (id, type, before, after, day, extra = {}) => ({ id, productId: 1, p
 const history = [row(1,'Alta',0,10,'01'), row(2,'Entrada',10,15,'02'), row(3,'Venta',15,12,'03',{saleId:'venta-1'}),
   row(4,'Ajuste',12,12,'04'), row(5,'Ajuste',12,16,'05'), row(6,'Ajuste',16,14,'06')];
 const choice = (p = product, rows = history) => kardexProducts([p], rows).find(item => item.key === String(p.id));
+
+test('hoy usa medianoche de Perú, IDs, variaciones reales, tipos de stock y todos los productos', () => {
+  const rows = [row(1,'Entrada',0,2,'20',{date:'2026-10-20T04:59:59Z'}),
+    row(2,'Salida',2,1,'20',{date:'2026-10-20T05:00:00Z',productId:99}),
+    row(3,'Ajuste',1,4,'20',{date:'2026-10-21T04:59:59Z',productId:null}),
+    row(4,'Alta',0,5,'21',{date:'2026-10-21T05:00:00Z'}), row(5,'Edición',1,1,'20')];
+  const original = structuredClone(rows);
+  const today=kardexToday([...rows,rows[1]], '2026-10-20T23:00:00Z');
+  assert.deepEqual(today.map(row=>row.id),[3,2]);
+  assert.deepEqual(today.map(row=>row.delta),[3,-1]);
+  assert.deepEqual(today.map(row=>row.productKey),['sin-id:ANTIGUO','99']);
+  assert.equal(kardexToday(rows,'2026-10-21T05:00:00Z')[0].id,4);
+  assert.equal(limaDay('2026-10-21T04:59:59Z'),'2026-10-20');
+  assert.deepEqual(kardexToday([], '2026-10-20'),[]);
+  assert.deepEqual(rows,original);
+});
 
 test('alta, entrada, venta y ajustes usan snapshots sin sumar ediciones ni duplicar ventas', () => {
   const frozen = structuredClone(history), result = buildKardex(choice(), [...history].reverse());
@@ -111,4 +127,42 @@ test('paginación y CSV usan todas las filas; CSV escapa fórmulas, saltos y com
   assert(csv.includes("'@operador")); assert(csv.includes("' =HYPERLINK")); assert(csv.includes('""comillas""'));
   const filtered=buildKardex(choice(),history,{type:'Venta'}), salesCsv=kardexCsv(choice(),filtered,{type:'Venta'});
   assert(salesCsv.includes('Venta venta-1')); assert(!salesCsv.includes('Movimiento #1'));
+});
+
+test('CSV estructurado conserva 11 columnas, SKU como texto, números y saldos independientes del tipo', () => {
+  function parseCsv(csv) {
+    const records = []; let record = [], cell = '', quoted = false;
+    const input = csv.replace(/^\uFEFF/, '');
+    for (let index = 0; index < input.length; index++) {
+      const char = input[index];
+      if (char === '"') {
+        if (quoted && input[index + 1] === '"') { cell += '"'; index++; }
+        else quoted = !quoted;
+      } else if (!quoted && (char === ';' || char === '\r')) {
+        record.push(cell); cell = '';
+        if (char === '\r') { records.push(record); record = []; assert.equal(input[++index], '\n'); }
+      } else cell += char;
+    }
+    assert.equal(quoted, false); record.push(cell); records.push(record); return records;
+  }
+  const dangerous = ' \t=HYPERLINK("x";"y")\nLínea de Perú: áéíóú';
+  const rows = history.map(item=>({...item,sku:'000123',reason:dangerous,user:'@operador'}));
+  const p = choice({...product,sku:'1E10',name:'Nombre; "histórico"'},rows);
+  const filters = {from:'2026-10-02',to:'2026-10-06',type:'Ajuste'};
+  const ledger = buildKardex(p,rows,filters), csv=kardexCsv(p,ledger,filters), parsed=parseCsv(csv);
+  assert(csv.startsWith('\uFEFF')); assert(!csv.includes('sep=;'));
+  for (const title of ['Información general','Resumen del producto','Movimientos del producto']) assert(parsed.some(record=>record[0]===title));
+  assert.deepEqual(parsed.find(record=>record[0]==='SKU actual o último conocido'),['SKU actual o último conocido',"'1E10"]);
+  for (const [label,value] of [['Saldo inicial del período',10],['Entradas registradas del período (todos los tipos)',9],['Salidas registradas del período (todos los tipos)',5],['Saldo final del período',14]]) assert.equal(Number(parsed.find(record=>record[0]===label)[1]),value);
+  const start=parsed.findIndex(record=>record[0]==='Fecha y hora (Perú, UTC−05:00)');
+  const data=parsed.slice(start+1);
+  assert.equal(parsed[start].length,11); assert.equal(data.length,2);
+  for (const record of data) {
+    assert.equal(record.length,11); assert.equal(record[1],'Mouse'); assert.equal(record[2],"'000123");
+    assert.equal(record[3],'Ajuste'); assert.equal(record[8],`'${dangerous}`); assert.equal(record[9],"'@operador");
+    for (const column of [4,5,6,7]) assert(Number.isFinite(Number(record[column])));
+  }
+  assert(data[0][0].includes('5/10/2026') && data[0][10].includes('Movimiento #5'));
+  const unknown=kardexCsv({...p,archived:true}, {...ledger,opening:null,closing:null,warnings:['Historial incompleto']});
+  assert(unknown.includes('No reconstruible') && unknown.includes('Historial incompleto') && unknown.includes('Fuera del catálogo'));
 });

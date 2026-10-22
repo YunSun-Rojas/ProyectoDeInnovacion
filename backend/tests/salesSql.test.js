@@ -35,7 +35,7 @@ test('SQL de ventas: descuento atómico, precio histórico, permisos y reintento
   const db = new PGlite();
   t.after(() => db.close());
   await db.exec(fixture);
-  await db.exec(await readFile(new URL('../../supabase/sql/ventas.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('./sql/ventas.sql', import.meta.url), 'utf8'));
   const call = (id, version, quantity, price) => db.query('select inventory_register_sale($1::uuid, 1::bigint, $2::bigint, $3::integer, $4::numeric) as result', [id, version, quantity, price]);
   const id = '00000000-0000-4000-8000-000000000010';
   const first = (await call(id, 1, 2, 75)).rows[0].result;

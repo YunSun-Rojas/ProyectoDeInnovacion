@@ -36,7 +36,19 @@ __pycache__/
 *.pyo
 
 # YOLO generated files
-backend/yolo/runs/
+backend/yolo/runs/*
+!backend/yolo/runs/detect/
+backend/yolo/runs/detect/*
+# Conservar ejecuciones históricas y el modelo activo; ignorar nuevas ejecuciones.
+!backend/yolo/runs/detect/monitores_v1/
+!backend/yolo/runs/detect/prueba/
+!backend/yolo/runs/detect/prueba-2/
+!backend/yolo/runs/detect/predict/
+!backend/yolo/runs/detect/predict-2/
+!backend/yolo/runs/detect/predict-3/
+!backend/yolo/runs/detect/predict-4/
 backend/yolo/*.pt
+!backend/yolo/yolov8n.pt
+backend/yolo/data/**/*.cache
 backend/yolo/bus.jpg
 backend/yolo/.cache/

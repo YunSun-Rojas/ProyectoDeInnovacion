@@ -1,7 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadInventory, saveInventoryChange } from '../api/inventoryApi';
 
 const initialState = { products: [], categories: [], movements: [], sales: [], salesEnabled: false, stockEnabled: false, readOnly: true, status: 'loading', error: '' };
+
+// El canal existente de notificaciones: una sola tarjeta, sin colas acumuladas.
+export function useInventoryNotifications() {
+  const [toast, setToast] = useState(null);
+  const timer = useRef(null);
+  const dismissToast = useCallback(() => setToast(null), []);
+  const notify = useCallback((message, type = 'success') => {
+    setToast(previous => previous?.message === message && previous.type === type && !previous.closing
+      ? previous : { message, type, closing: false });
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setToast(previous => previous ? { ...previous, closing: true } : null), 3500);
+  }, []);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  return { toast, notify, dismissToast };
+}
 
 export function useInventory(userId) {
   const [state, setState] = useState(initialState);
@@ -12,6 +27,7 @@ export function useInventory(userId) {
   const [writeError, setWriteError] = useState('');
   const [uncertain, setUncertain] = useState(false);
   const pendingRequest = useRef(null);
+  const confirmedChange = useRef(null);
   const locked = useRef(false);
   const active = useRef(true);
   useEffect(() => {
@@ -78,6 +94,9 @@ export function useInventory(userId) {
         sales: result.sale ? [result.sale, ...(previous.sales ?? []).filter(sale => sale.id !== result.sale.id)] : (previous.sales ?? []),
         ...(latest ?? {}),
       }));
+      // Respuesta de ESTA solicitud, independiente del orden del historial o de otras lecturas.
+      confirmedChange.current = { requestId: request.requestId, action: request.action, productId: request.productId,
+        product: product ? { ...product } : null, movement: movement ? { ...movement } : null };
       pendingRequest.current = null;
       setUncertain(false);
       return true;
@@ -109,6 +128,7 @@ export function useInventory(userId) {
   };
 
   return { ...state, retry, refreshing, saving: saving || refreshing, writeError, uncertain,
+    getConfirmedChange: () => confirmedChange.current,
     retryWrite: () => pendingRequest.current ? execute(pendingRequest.current, true) : Promise.resolve(false),
     onAdd: data => mutate('add', null, data),
     onEdit: (product, data) => mutate('catalog_edit', product, data),

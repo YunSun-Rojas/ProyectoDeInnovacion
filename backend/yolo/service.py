@@ -13,13 +13,16 @@ import time
 import warnings
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parent
 MODEL_PATH = ROOT / 'runs/detect/monitores_v1/weights/best.pt'
 CACHE = Path(__file__).resolve().parent / '.cache'
 (CACHE / 'Ultralytics').mkdir(parents=True, exist_ok=True)
 os.environ.setdefault('YOLO_CONFIG_DIR', str(CACHE))
+os.environ.setdefault('YOLO_AUTOINSTALL', '0')
 
 from PIL import Image, ImageOps, UnidentifiedImageError  # noqa: E402
+
+_pil_image_open = Image.open
 
 MAX_BYTES = 8 * 1024 * 1024
 MAX_PIXELS = 16_000_000
@@ -38,7 +41,7 @@ def decode_image(raw, content_type):
     try:
         with warnings.catch_warnings():
             warnings.simplefilter('error', Image.DecompressionBombWarning)
-            with Image.open(io.BytesIO(raw)) as source:
+            with _pil_image_open(io.BytesIO(raw)) as source:
                 if source.format != FORMATS[content_type]:
                     raise ImageError('El contenido no coincide con el formato declarado.')
                 width, height = source.size
@@ -47,7 +50,7 @@ def decode_image(raw, content_type):
                 if getattr(source, 'n_frames', 1) != 1:
                     raise ImageError('Selecciona una imagen estática, no una animación.')
                 source.verify()
-            with Image.open(io.BytesIO(raw)) as source:
+            with _pil_image_open(io.BytesIO(raw)) as source:
                 return ImageOps.exif_transpose(source).convert('RGB')
     except ImageError:
         raise
@@ -58,7 +61,7 @@ def decode_image(raw, content_type):
 class Detector:
     def __init__(self):
         if not MODEL_PATH.is_file():
-            raise RuntimeError('No existe runs/detect/monitores_v1/weights/best.pt. No se carga ningún modelo alternativo.')
+            raise RuntimeError('No existe backend/yolo/runs/detect/monitores_v1/weights/best.pt. No se carga ningún modelo alternativo.')
         from ultralytics import YOLO
         import ultralytics
         self.model = YOLO(str(MODEL_PATH), task='detect')

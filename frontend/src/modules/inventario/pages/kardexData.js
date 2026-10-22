@@ -1,7 +1,20 @@
-const limaDay = value => new Date(value).toLocaleDateString('sv-SE', { timeZone: 'America/Lima' });
+export const limaDay = value => new Date(value).toLocaleDateString('sv-SE', { timeZone: 'America/Lima' });
 const hasId = value => value !== null && value !== undefined && value !== '';
 const movementKey = row => hasId(row.productId) ? String(row.productId) : `sin-id:${row.sku || ''}`;
 const validStock = value => Number.isSafeInteger(value) && value >= 0 && value <= 2147483647;
+
+export function kardexToday(movements, now = new Date()) {
+  const day = limaDay(now), seen = new Set();
+  return movements.filter(row => {
+    if (!hasId(row.id) || !Number.isFinite(Date.parse(row.date)) || limaDay(row.date) !== day
+      || !validStock(row.before) || !validStock(row.after) || row.before === row.after
+      || !['Alta', 'Entrada', 'Salida', 'Ajuste', 'Venta', 'Baja'].includes(row.type)) return false;
+    const id = String(row.id);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  }).sort((a, b) => compareMovements(b, a)).map(row => ({ ...row, delta: row.after - row.before, productKey: movementKey(row) }));
+}
 
 export function compareMovements(a, b) {
   const time = Date.parse(a.date) - Date.parse(b.date);
@@ -119,23 +132,28 @@ export function kardexPage(rows, requestedPage, size = 25) {
 
 const csvCell = value => {
   let text = String(value ?? '');
-  if (typeof value === 'string' && /^[\s]*[=+@-]/.test(text)) text = `'${text}`;
+  const first = [...text].find(char => char.charCodeAt(0) > 32 && !/\s/.test(char));
+  if (typeof value === 'string' && first && '=+@-'.includes(first)) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
 };
 export const kardexDate = value => new Date(value).toLocaleString('es-PE', { timeZone: 'America/Lima' });
 
-export function kardexCsv(choice, ledger, { from = '', to = '', type = 'Todos', audit = false } = {}) {
+export function kardexCsv(choice, ledger, { from = '', to = '', type = 'Todos' } = {}) {
   const balance = value => value == null ? 'No reconstruible' : value;
+  // Texto explícito sin fórmulas: Excel puede mostrar el apóstrofo protector.
+  const skuText = value => value == null || value === '' ? '' : `'${String(value)}`;
   const lines = [
-    ['Kardex de inventario · cantidades'], ['Producto', choice.name], ['SKU actual o último conocido', choice.sku],
+    ['Kardex de inventario'], ['Información general'], ['Producto', choice.name], ['SKU actual o último conocido', skuText(choice.sku)],
     ['Identidad de producto', choice.id ?? 'Sin ID'], ['Desde (Lima)', from || 'Todo el historial'], ['Hasta (Lima)', to || 'Último registro disponible'],
-    ['Tipo visible', type], ['Incluir variación cero', audit ? 'Sí' : 'No'],
+    ['Tipo de movimiento seleccionado', type], ['Estado del producto', choice.legacy ? 'Sin identidad histórica verificable' : choice.archived ? 'Fuera del catálogo' : 'En el catálogo'],
     ['Stock actual', choice.archived ? 'Fuera del catálogo actual' : choice.stock],
+    [], ['Resumen del producto'],
     ['Saldo inicial del período', balance(ledger.opening)], ['Entradas registradas del período (todos los tipos)', balance(ledger.entries)],
     ['Salidas registradas del período (todos los tipos)', balance(ledger.exits)], ['Saldo final del período', balance(ledger.closing)],
     ...ledger.warnings.map(warning => ['Advertencia de historial', warning]), [],
-    ['Fecha y hora (Lima)', 'Producto histórico', 'SKU histórico', 'Tipo', 'Entrada', 'Salida', 'Stock anterior', 'Saldo posterior', 'Motivo', 'Responsable', 'Referencia'],
-    ...ledger.rows.map(row => [kardexDate(row.date), row.product, row.sku, row.type, row.entry, row.exit, row.before, row.after, row.reason, row.user, row.reference]),
+    ['Movimientos del producto'],
+    ['Fecha y hora (Perú, UTC−05:00)', 'Producto histórico', 'SKU histórico', 'Tipo', 'Entrada', 'Salida', 'Stock anterior', 'Saldo posterior', 'Motivo', 'Responsable', 'N.º de movimiento / referencia'],
+    ...ledger.rows.map(row => [kardexDate(row.date), row.product, skuText(row.sku), row.type, row.entry, row.exit, row.before, row.after, row.reason, row.user, row.reference]),
   ];
   return '\uFEFF' + lines.map(line => line.map(csvCell).join(';')).join('\r\n');
 }

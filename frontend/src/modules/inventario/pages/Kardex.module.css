@@ -1,45 +1,51 @@
-.workspace .selector { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(260px, 1.5fr); align-items: end; }
+.workspace .heading { margin-bottom: 18px; }
+.heading h1 { margin: 0; }
+.workspace .selector { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(260px, 1.5fr); align-items: end; margin-top: 18px; }
 .selector p { grid-column: 1 / -1; margin: 0; font-size: 11px; }
-.product { display: flex; align-items: center; gap: 18px; margin: 24px 0; border-radius: 14px; }
-.productIcon { display: grid; place-items: center; width: 52px; height: 52px; flex-shrink: 0; border-radius: 13px; color: var(--inventory-danger, #c52b3a); background: var(--inventory-accent-tint, #fff0f1); }
-.product h2 { font-size: 20px; font-weight: 700; margin: 5px 0; letter-spacing: -.025em; overflow-wrap: anywhere; }
-.product p { margin: 0; overflow-wrap: anywhere; }
-.workspace .periodFilters { display: grid; grid-template-columns: 1fr 1fr 1.2fr 1.3fr auto; align-items: end; }
-.workspace .audit { flex-direction: row; gap: 9px; align-items: center; min-height: 44px; color: var(--inventory-ink, #202735); font-size: 12px; }
-.workspace .audit input { width: 17px; height: 17px; min-height: 17px; flex-shrink: 0; padding: 0; accent-color: #e32636; }
-.workspace .cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 18px 0; }
-.workspace .cards > article { padding: 20px; }
-.cardLabel { display: flex; align-items: center; }
-.cards article > span { font-size: 11px; display: block; line-height: 1.6; }
-.cards article strong { font-size: 28px; margin: 12px 0 8px; }
-.explanation { font-size: 12px; margin: 16px 0 24px; }
-.quality { padding: 18px 20px; margin: 22px 0; border: 1px solid color-mix(in srgb, var(--inventory-warning, #8a5d15) 25%, transparent); border-radius: 12px; background: var(--inventory-warning-tint, #fff7e7); color: var(--inventory-warning, #805414); }
+.workspace .selector input[type='search'] { width: 100%; padding-left: 37px; }
+.back { margin-bottom: 12px; }
+.product { display: flex; align-items: center; padding: 16px 20px; margin: 0 0 16px; border-radius: 14px; }
+.product h2 { font-size: 18px; font-weight: 700; margin: 0 0 5px; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.product p { margin: 0; font-size: 12px; overflow-wrap: anywhere; }
+.workspace .periodFilters { display: grid; grid-template-columns: 1fr 1fr 1.3fr auto; align-items: end; margin: 16px 0; }
+.periodFilters input[type='date'] { color-scheme: inherit; }
+.period { font-size: 12px; }
+.summary { padding: 18px 20px; margin: 18px 0; }
+.summary h2, .today h2 { margin: 0 0 14px; font-size: 16px; font-weight: 650; }
+.summary dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.metric { --metric-accent: var(--inventory-muted, #687182); min-width: 0; padding: 14px; border: 1px solid var(--inventory-border, #e7e9ee); border-radius: 12px; background: var(--inventory-surface-alt, #f8f9fb); animation: metricAppear 240ms ease-out both; transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease; }
+.metric[data-tone='entry'] { --metric-accent: var(--inventory-success, #23724b); background: color-mix(in srgb, var(--metric-accent) 7%, var(--inventory-surface, #fff)); border-color: color-mix(in srgb, var(--metric-accent) 20%, var(--inventory-border, #e7e9ee)); }
+.metric[data-tone='exit'] { --metric-accent: var(--inventory-danger, #bc2333); background: color-mix(in srgb, var(--metric-accent) 6%, var(--inventory-surface, #fff)); border-color: color-mix(in srgb, var(--metric-accent) 20%, var(--inventory-border, #e7e9ee)); }
+.metric[data-tone='final'] { box-shadow: inset 0 2px color-mix(in srgb, #e32636 45%, transparent); }
+.metric:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--metric-accent) 38%, var(--inventory-border, #e7e9ee)); box-shadow: 0 3px 10px rgb(15 23 42 / 5%); }
+.metric[data-tone='final']:hover { box-shadow: inset 0 2px color-mix(in srgb, #e32636 45%, transparent), 0 3px 10px rgb(15 23 42 / 5%); }
+.summary dt { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--inventory-muted, #687182); margin-bottom: 10px; }
+.summary dt svg { flex-shrink: 0; padding: 6px; color: var(--metric-accent); background: color-mix(in srgb, var(--metric-accent) 10%, var(--inventory-surface, #fff)); border-radius: 8px; }
+.summary dd { margin: 0; font-size: 23px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.quality { padding: 16px 20px; margin: 18px 0; border: 1px solid color-mix(in srgb, var(--inventory-warning, #8a5d15) 25%, transparent); border-radius: 12px; background: var(--inventory-warning-tint, #fff7e7); color: var(--inventory-warning, #805414); }
 .quality h2 { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 700; margin: 0 0 10px; }
 .quality ul { list-style: disc; padding-left: 20px; margin: 0; font-size: 12px; line-height: 1.8; }
 .quality svg { flex-shrink: 0; }
-.table { min-width: 1260px; }
+.table { min-width: 1050px; }
 .table :is(th, td):nth-child(n+3):nth-child(-n+6) { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.table td:first-child { white-space: nowrap; font-size: 11px; }
+.table td:first-child { white-space: nowrap; font-size: 12px; }
+.table td:first-child p { font-size: 11px; }
 .table td:nth-child(3) { color: var(--inventory-success, #23724b); }
 .table td:nth-child(4) { color: var(--inventory-danger, #bc2333); }
-.table td:nth-child(7) { min-width: 190px; max-width: 300px; overflow-wrap: anywhere; }
-.table td:nth-child(8), .table td:last-child { min-width: 150px; max-width: 240px; font-size: 11px; overflow-wrap: anywhere; color: var(--inventory-muted, #687182); }
-.empty { display: flex; align-items: center; flex-direction: column; gap: 12px; padding: 48px 24px; text-align: center; margin-top: 20px; }
+.table td:nth-child(7) { min-width: 230px; max-width: 350px; overflow-wrap: break-word; word-break: normal; }
+.today { padding: 20px; }
+.todayList { list-style: none; padding: 0; margin: 0; }
+.todayList li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--inventory-border, #e7e9ee); }
+.todayList li > div { min-width: 0; overflow-wrap: anywhere; }
+.todayList li span { display: block; margin-top: 6px; font-size: 13px; color: var(--inventory-muted, #687182); }
+.todayList button { flex-shrink: 0; }
+.today > p { margin: 14px 0 0; font-size: 12px; }
+.empty { display: flex; align-items: center; flex-direction: column; gap: 12px; padding: 36px 20px; text-align: center; }
 .empty > svg { color: var(--inventory-danger, #c52b3a); }
-.empty h2 { font-size: 18px; font-weight: 650; }
+.empty :is(h2, h3) { font-size: 17px; font-weight: 650; margin: 0; }
 .empty p { max-width: 540px; margin: 0; }
-@media (max-width: 1200px) {
-  .workspace .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .workspace .periodFilters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (max-width: 800px) {
-  .workspace .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .workspace .selector, .workspace .periodFilters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (max-width: 540px) {
-  .workspace .selector, .workspace .periodFilters { grid-template-columns: minmax(0, 1fr); }
-  .workspace .cards { grid-template-columns: minmax(0, 1fr); }
-  .product { align-items: flex-start; padding: 18px; gap: 12px; }
-  .productIcon { width: 38px; height: 38px; border-radius: 10px; }
-  .product h2 { font-size: 18px; }
-}
+@media (max-width: 1000px) { .workspace .periodFilters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@keyframes metricAppear { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .metric { animation: none; transition: none; } .metric:hover { transform: none; } }
+@media (max-width: 650px) { .workspace .selector { grid-template-columns: minmax(0, 1fr); } .summary dl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+@media (max-width: 480px) { .workspace .periodFilters { grid-template-columns: minmax(0, 1fr); } .todayList li { align-items: flex-start; flex-direction: column; gap: 10px; } }

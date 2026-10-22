@@ -26,7 +26,7 @@ test('migración de catálogo con funciones reales exportadas en entorno aislado
   const beforeSales = (await db.query('select * from inventory_sales order by id')).rows;
   const acl = (await db.query("select proacl::text from pg_proc where oid='inventory_mutate(uuid,text,bigint,bigint,jsonb)'::regprocedure")).rows;
   // Se ejecuta el archivo completo, incluidos preflight y COMMIT, solo en memoria.
-  await db.exec(await readFile(new URL('../../supabase/sql/20261013_catalog_products.proposed.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('./sql/20261013_catalog_products.proposed.sql', import.meta.url), 'utf8'));
 
   await t.test('ampliación conserva datos previos, ACL, ventas e historial', async () => {
     const after = (await db.query('select * from products')).rows;

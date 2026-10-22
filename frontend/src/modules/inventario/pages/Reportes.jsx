@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RefreshCw, Download, ChartNoAxesCombined, ArrowDownLeft, ArrowUpRight, Scale, Coins, ClipboardCheck, PackageX } from 'lucide-react';
+import { RefreshCw, Download, ChartNoAxesCombined, ArrowDownLeft, ArrowUpRight, Scale, PackageX, ArrowLeft, ArrowRight } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { loadReports } from '../api/inventoryApi';
 import { buildReports, searchReport, reportPage, reportsCsv, reportDay, periodBucket } from './reportsData';
@@ -7,10 +7,10 @@ import s from './Management.module.css';
 import ui from './InventoryUI.module.css';
 import styles from './Reportes.module.css';
 
-const money = n => n == null ? 'No disponible' : new Intl.NumberFormat('es-PE',{style:'currency',currency:'PEN'}).format(n);
 const number = n => n == null ? 'Sin datos' : new Intl.NumberFormat('es-PE',{maximumFractionDigits:2}).format(n);
 const types = { flow:'Entradas y salidas', ranking:'Mayor rotación por salidas', inactive:'Productos sin movimiento', value:'Valor actual del inventario', counts:'Diferencias de conteos', sessions:'Sesiones de inventario físico' };
 const signed = n => `${n > 0 ? '+' : ''}${number(n)}`;
+const numericHeaders = new Set(['Stock actual','Unidades salientes','Movimientos','Costo unitario PEN','Valor actual PEN','Entradas (unidades)','Salidas (unidades)','Referencia','Físico','Diferencia','Sobrantes','Faltantes','Líneas contadas','Sin contar','Con diferencias']);
 const chartDate = (date, group) => group==='month'
   ? new Date(`${date}T12:00:00Z`).toLocaleDateString('es-PE',{month:'short',year:'2-digit',timeZone:'America/Lima'})
   : `${date.slice(8,10)}/${date.slice(5,7)}/${date.slice(2,4)}`;
@@ -22,6 +22,18 @@ function FlowTooltip({ active, payload, group }) {
     <p><span className={styles.entryDot} aria-hidden="true" />Entradas <b>{number(row.entries)} uds.</b></p>
     <p><span className={styles.exitDot} aria-hidden="true" />Salidas <b>{number(row.exits)} uds.</b></p>
   </div>;
+}
+
+export function FlowReportRow({ row }) {
+  const extraOrigin = row.origin && String(row.origin).trim() !== String(row.type ?? '').trim();
+  return <tr>
+    <td className={styles.flowDate}>{reportDay(row.date)}</td>
+    <td className={styles.flowProduct}><strong>{row.product ?? 'No disponible'}</strong><span>{row.sku ?? 'No disponible'}</span></td>
+    <td><span className={styles.typeBadge} data-kind={row.type}>{row.type ?? 'No disponible'}</span>{extraOrigin && <span className={styles.flowOrigin}>{row.origin}</span>}</td>
+    <td className={styles.numeric}>{row.entries ?? 'No disponible'}</td>
+    <td className={styles.numeric}>{row.exits ?? 'No disponible'}</td>
+    <td className={styles.flowReason}>{row.reason ?? 'No disponible'}</td>
+  </tr>;
 }
 
 export default function Reportes() {
@@ -59,6 +71,7 @@ export default function Reportes() {
     sessions:{rows:report.countSessions,headers:['Sesión','Fecha de creación (Lima)','Estado','Responsable','Líneas contadas','Sin contar','Con diferencias','Sobrantes','Faltantes'],values:r=>[r.id,reportDay(r.created_at),r.status,r.actor_email,r.counted,r.pending,r.differences,r.surplus,r.shortage]},
   }:null;
   const config=configs?.[kind];
+  const tableHeaders=kind==='flow'?['Fecha','Producto / SKU','Movimiento','Entrada','Salida','Motivo']:config?.headers;
   const rows=config&&!unavailable?searchReport(config.rows,query,sort):[];
   const pagination=reportPage(rows,page,20);
   const note='Fechas inclusivas de Lima. Flujos por saldo posterior menos anterior; no suman ventas otra vez. Ranking solo Salida/Venta; no es tasa de rotación ni demanda certificada. Valor actual a costo de compra, independiente del periodo. Conteos por fecha de creación; precisión excluye sin contar y cancelados. Cancelados se muestran solo como historial. Consulta '+(data?.consultedAt||'');
@@ -72,31 +85,28 @@ export default function Reportes() {
   function change(setter,value){setter(value);setPage(1);}
   function changeKind(value){setKind(value);setSort(value==='ranking'?'units':['flow','sessions','counts'].includes(value)?'date':'name');setPage(1);}
   return <div className={`${s.page} ${ui.workspace} ${styles.workspace}`} aria-busy={loading}>
-    <header className={`${s.header} ${ui.heading}`}><div><span className={ui.eyebrow}>ALMACÉN · ANÁLISIS DE SOLO LECTURA</span><h1>Reportes e indicadores</h1><p className={s.muted}>Historial registrado, indicadores operativos y valorización actual a costo de compra.</p></div><button className={ui.secondary} disabled={loading} onClick={refresh}><RefreshCw size={16} aria-hidden="true" />{loading?'Consultando…':'Actualizar'}</button></header>
+    <header className={`${s.header} ${ui.heading} ${styles.heading}`}><div><h1>Reportes e indicadores</h1></div><button className={ui.secondary} disabled={loading} onClick={refresh}><RefreshCw size={16} aria-hidden="true" />{loading?'Consultando…':'Actualizar'}</button></header>
     {loading&&<p role="status" className={ui.notice}>Consultando el historial completo autorizado…</p>}
     {(error||calculationError)&&<p role="alert" className={ui.alert}>{error||calculationError}</p>}
-    <div className={`${s.filters} ${ui.filters}`}><label className={s.field}>Fecha inicial (Lima)<input type="date" value={from} onChange={e=>change(setFrom,e.target.value)} /></label><label className={s.field}>Fecha final (Lima)<input type="date" value={to} onChange={e=>change(setTo,e.target.value)} /></label><label className={s.field}>Agrupación<select value={group} onChange={e=>change(setGroup,e.target.value)}><option value="day">Día</option><option value="week">Semana (lunes)</option><option value="month">Mes</option></select></label></div>
+    <section className={`${s.card} ${styles.period} ${ui.productFilters}`} aria-labelledby="report-period-title"><h2 id="report-period-title">Período de análisis</h2><div className={`${s.filters} ${styles.periodFields}`}><label className={s.field}>Desde<input type="date" value={from} onChange={e=>change(setFrom,e.target.value)} /></label><label className={s.field}>Hasta<input type="date" value={to} onChange={e=>change(setTo,e.target.value)} /></label><label className={s.field}>Agrupar por<select value={group} onChange={e=>change(setGroup,e.target.value)}><option value="day">Día</option><option value="week">Semana</option><option value="month">Mes</option></select></label></div></section>
     {report&&<>
       <section className={`${styles.cards} ${ui.summary}`} aria-label="Indicadores del periodo completo">
         {[
           ['Entradas',historyKnown?number(report.entries):'No disponible','unidades · periodo seleccionado','Variaciones positivas registradas',ArrowDownLeft,'entries'],
           ['Salidas',historyKnown?number(report.exits):'No disponible','unidades · periodo seleccionado','Variaciones negativas registradas',ArrowUpRight,'exits'],
           ['Balance neto',historyKnown?signed(report.net):'No disponible','unidades · entradas − salidas',historyKnown?(report.net>0?'Predominan las entradas':report.net<0?'Predominan las salidas':'Sin variación neta'):'Historial no habilitado',Scale,'balance'],
-          ['Valor del inventario',money(report.value),'PEN · a costo de compra',`${report.covered}/${report.total} productos con costo válido · valor actual`,Coins,'value'],
-          ['Precisión de conteos',countsKnown&&report.accuracy!==null?number(report.accuracy)+' %':'Sin datos',countsKnown?`${number(report.counted)} líneas contadas utilizadas`:'Conteos no habilitados',countsKnown?`${number(report.matched)} sin diferencia · excluye pendientes y canceladas`:'Requiere datos de Inventario físico',ClipboardCheck,'accuracy'],
           ['Productos agotados',number(report.empty),'productos · stock actual = 0',report.empty>0?'Requieren atención de reposición':'Sin productos agotados en el catálogo',PackageX,report.empty>0?'empty':'clear'],
         ].map(([label,value,unit,description,Icon,tone])=><article key={label} className={styles.kpi} data-tone={tone}>
           <div className={styles.kpiHeading}><span>{label}</span><Icon size={16} aria-hidden="true" /></div>
           <strong className={styles.kpiValue}>{value}</strong><span className={styles.kpiUnit}>{unit}</span>
           <p className={styles.kpiDescription}>{description}</p>
-          {tone==='value'&&<span className={styles.costTag}>Valor a costo · no es ingreso por ventas</span>}
         </article>)}
       </section>
       
       
       {!countsKnown&&<p className={ui.notice} role="status">Los reportes de conteos requieren habilitar las tablas y políticas de Fase 5. No se interpreta su ausencia como cero diferencias.</p>}
       {!historyKnown&&<p className={ui.notice} role="status">El historial de movimientos no está habilitado para esta cuenta. Los flujos, ranking y productos sin movimiento no están disponibles.</p>}
-      <section className={`${s.card} ${styles.chartCard}`} aria-label="Gráfico de flujos"><div className={styles.chartHeading}><div><span className={ui.eyebrow}>FLUJO DE ALMACÉN</span><h2>Entradas y salidas por {group==='day'?'día':group==='week'?'semana':'mes'}</h2></div><span className={styles.chartUnit}>Unidades de producto</span></div>
+      <section className={`${s.card} ${styles.chartCard}`} aria-label="Gráfico de flujos"><div className={styles.chartHeading}><div><h2>Flujo de almacén</h2><p>Entradas y salidas por {group==='day'?'día':group==='week'?'semana':'mes'}</p></div></div>
         {historyKnown&&report.series.length?<div className={styles.chart} role="img" aria-label={`Entradas ${report.entries}, salidas ${report.exits} unidades`}><ResponsiveContainer width="100%" height="100%"><BarChart data={report.series} accessibilityLayer margin={{top:12,right:12,left:0,bottom:8}} barGap={4}>
           <CartesianGrid vertical={false} stroke="var(--inventory-border, #e5e7eb)" strokeDasharray="3 5" />
           <XAxis dataKey="date" tickFormatter={date=>chartDate(date,group)} tick={{fill:'var(--inventory-muted, #64748b)',fontSize:11}} minTickGap={24} tickMargin={12} axisLine={false} tickLine={false} />
@@ -109,18 +119,22 @@ export default function Reportes() {
         <p className={styles.chartFootnote}>Solo periodos con movimientos registrados. Las semanas comienzan el lunes; sus barras incluyen únicamente las fechas seleccionadas.</p>
       </section>
     </>}
-    <section className={styles.section} aria-label="Detalle de reportes"><div className={`${s.filters} ${ui.filters}`}>
+    <section className={`${s.card} ${styles.section}`} aria-labelledby="report-detail-title"><h2 id="report-detail-title">Detalle del reporte</h2><div className={`${s.filters} ${ui.productFilters} ${styles.detailFilters}`}>
       <label className={s.field}>Reporte<select value={kind} onChange={e=>changeKind(e.target.value)}>{Object.entries(types).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
-      <label className={s.field}>Buscar producto, SKU o sesión<input type="search" value={query} onChange={e=>change(setQuery,e.target.value)} /></label>
-      <label className={s.field}>Orden<select value={sort} onChange={e=>change(setSort,e.target.value)}><option value="date">Fecha descendente</option><option value="name">Producto / referencia</option><option value="stock">Stock ascendente</option><option value="units">Unidades salientes descendentes</option></select></label>
+      <label className={s.field}>Buscar<input type="search" placeholder="Producto, SKU o sesión" value={query} onChange={e=>change(setQuery,e.target.value)} /></label>
+      <label className={s.field}>Ordenar por<select value={sort} onChange={e=>change(setSort,e.target.value)}><option value="date">Fecha descendente</option><option value="name">Producto / referencia</option><option value="stock">Stock ascendente</option><option value="units">Unidades salientes descendentes</option></select></label>
       {kind==='ranking'&&<label className={s.field}>Ranking<select value={top} onChange={e=>change(setTop,Number(e.target.value))}>{[5,10,20].map(n=><option key={n} value={n}>Top {n}</option>)}</select></label>}
       <button className={ui.secondary} disabled={!config||unavailable||loading||!!error||!!calculationError} onClick={download}><Download size={16} aria-hidden="true" />Exportar CSV</button>
-    </div><h2>{types[kind]}</h2>
+    </div><h3 className={styles.reportTitle}>{types[kind]}</h3>
     {kind==='ranking'&&<p className={ui.notice}>Indicador operativo por unidades salientes de tipos Salida y Venta. Excluye Ajuste, Alta y Baja; no es una tasa formal de rotación. El motivo libre de una Salida no permite certificar si fue consumo interno o demanda. Referencias sin ID se identifican solo por SKU.</p>}
     {kind==='inactive'&&<p className={ui.notice}>Catálogo actual sin registros en el periodo, incluidos cambios sin variación de stock. La última fecha conocida considera todo el historial disponible, incluso registros posteriores al periodo. Un historial sin ID no permite certificar identidad por SKU.</p>}
-    <p className={s.muted} role="status">{rows.length} filas · CSV con todas las filas filtradas, no solo esta página.{data?.consultedAt&&` Consulta: ${new Date(data.consultedAt).toLocaleString('es-PE',{timeZone:'America/Lima'})}`}</p>
-    <div className={`${s.tableWrap} ${ui.tableSurface}`} role="region" aria-label="Tabla del reporte" tabIndex={0}>{config&&rows.length?<table className={`${s.table} ${styles.table}`}><caption className={styles.srOnly}>{types[kind]}</caption><thead><tr>{config.headers.map(h=><th key={h} scope="col">{h}</th>)}</tr></thead><tbody>{pagination.rows.map((row,i)=><tr key={`${row.id??row.session_id??row.sku}:${row.product_id??i}`}>{config.values(row).map((value,j)=><td key={j}>{value==null?'No disponible':String(value)}</td>)}</tr>)}</tbody></table>:<div className={s.empty}><ChartNoAxesCombined size={32} aria-hidden="true" /><p>{loading?'Cargando reportes…':unavailable?'Este reporte requiere datos o permisos aún no habilitados.':error||calculationError?'No se pudo generar el reporte.':'No hay registros para los filtros seleccionados.'}</p></div>}</div>
-    <nav className={ui.pagination} aria-label="Paginación del reporte"><button className={ui.secondary} disabled={pagination.page<=1} onClick={()=>setPage(pagination.page-1)}>Anterior</button><span>Página {pagination.page} de {pagination.pages}</span><button className={ui.secondary} disabled={pagination.page>=pagination.pages} onClick={()=>setPage(pagination.page+1)}>Siguiente</button></nav>
+    <p className={`${s.muted} ${styles.counter}`} role="status">{rows.length} registros</p>
+    <div className={`${s.tableWrap} ${ui.tableSurface}`} role="region" aria-label="Tabla del reporte" tabIndex={0}>{config&&rows.length?<table className={`${s.table} ${styles.table} ${kind==='flow'?styles.flowTable:''}`}><caption className={styles.srOnly}>{types[kind]}</caption><thead><tr>{tableHeaders.map(h=><th key={h} scope="col" aria-label={kind==='flow'&&['Entrada','Salida'].includes(h)?`${h} (unidades)`:undefined} className={numericHeaders.has(h)||kind==='flow'&&['Entrada','Salida'].includes(h)?styles.numeric:undefined}>{h}</th>)}</tr></thead><tbody>{pagination.rows.map((row,i)=>kind==='flow'?<FlowReportRow key={row.id} row={row} />:<tr key={`${row.id??row.session_id??row.sku}:${row.product_id??i}`}>{config.values(row).map((value,j)=>{
+      const header=config.headers[j];
+      const cellClass=header==='SKU'||header==='Sesión'?styles.identifier:header==='Producto'?styles.productName:numericHeaders.has(header)?styles.numeric:header==='Origen identificable'?styles.origin:undefined;
+      return <td key={j} className={cellClass}>{header==='Tipo registrado'?<span className={styles.typeBadge} data-kind={value}>{value==null?'No disponible':String(value)}</span>:value==null?'No disponible':String(value)}</td>;
+    })}</tr>)}</tbody></table>:<div className={s.empty}><ChartNoAxesCombined size={32} aria-hidden="true" /><p>{loading?'Cargando reportes…':unavailable?'Este reporte requiere datos o permisos aún no habilitados.':error||calculationError?'No se pudo generar el reporte.':'No hay registros para los filtros seleccionados.'}</p></div>}</div>
+    {pagination.pages>1&&<nav className={ui.pagination} aria-label="Paginación del reporte"><button className={ui.secondary} disabled={pagination.page<=1} onClick={()=>setPage(pagination.page-1)}><ArrowLeft size={16} aria-hidden="true" />Anterior</button><span>Página {pagination.page} de {pagination.pages}</span><button className={ui.secondary} disabled={pagination.page>=pagination.pages} onClick={()=>setPage(pagination.page+1)}>Siguiente<ArrowRight size={16} aria-hidden="true" /></button></nav>}
     </section>
   </div>;
 }

@@ -11,8 +11,8 @@ test('conteo cero, pendiente y diferencias', () => {
 });
 test('Fase 5 aislada: persistencia, permisos, conflictos, idempotencia y rollback', async t => {
  const db = new PGlite(); t.after(() => db.close());
- for (const file of ['./fixtures/catalogDatabase.sql','../../supabase/sql/20261013_catalog_products.proposed.sql','../../supabase/sql/20261014_stock_movements.proposed.sql']) await db.exec(await readFile(new URL(file,import.meta.url),'utf8'));
- const proposal=await readFile(new URL('../../supabase/sql/20261014_physical_inventory.proposed.sql',import.meta.url),'utf8');
+ for (const file of ['./fixtures/catalogDatabase.sql','./sql/20261013_catalog_products.proposed.sql','./sql/20261014_stock_movements.proposed.sql']) await db.exec(await readFile(new URL(file,import.meta.url),'utf8'));
+ const proposal=await readFile(new URL('./sql/20261014_physical_inventory.proposed.sql',import.meta.url),'utf8');
  // Ejecutar solamente el preflight de la propuesta en transacciones locales.
  const preflight=proposal.slice(0,proposal.indexOf('CREATE TABLE public.inventory_counts'));
  await t.test('preflight detecta dependencias y privilegios alterados',async () => {

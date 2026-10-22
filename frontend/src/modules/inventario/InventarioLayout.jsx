@@ -1,13 +1,37 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { DATE_RANGES, limaDate, periodRange, summarizeMovements } from './pages/dashboardData';
 import { summarizeSales } from './pages/salesData';
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
-import { useInventory } from "./hooks/useInventory";
+import { useInventory, useInventoryNotifications } from "./hooks/useInventory";
 import s from "./pages/Management.module.css";
 import ui from './pages/InventoryUI.module.css';
+import { CircleCheck, CircleAlert } from 'lucide-react';
+
+export function InventoryToast({ toast, onDismiss }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    // El popover permite ver errores por encima del dialog nativo sin robar foco.
+    const element = ref.current;
+    if (toast && element?.showPopover && !element.matches(':popover-open')) element.showPopover();
+  }, [toast]);
+  useEffect(() => {
+    if (!toast?.closing) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { onDismiss(); return; }
+    const timer = window.setTimeout(onDismiss, 180);
+    return () => window.clearTimeout(timer);
+  }, [toast?.closing, onDismiss]);
+  if (!toast) return null;
+  const isError = toast.type === 'error';
+  const Icon = isError ? CircleAlert : CircleCheck;
+  return <div ref={ref} popover="manual" role={isError ? 'alert' : 'status'} aria-live={isError ? 'assertive' : 'polite'} aria-atomic="true"
+    className={`${ui.toast} ${isError ? ui.toastError : ''} ${toast.closing ? ui.toastClosing : ''}`}
+    onAnimationEnd={event => { if (toast.closing && event.target === event.currentTarget) onDismiss(); }}>
+    <Icon size={21} aria-hidden="true" /><span>{toast.message}</span>
+  </div>;
+}
 
 export default function InventarioLayout({ userId }) {
   const navigate = useNavigate();
@@ -51,29 +75,7 @@ export default function InventarioLayout({ userId }) {
   const activity = useMemo(() => summarizeMovements(inventory.movements, periodRange(selectedRange, today)), [inventory.movements, selectedRange, today]);
   const salesSummary = useMemo(() => summarizeSales(inventory.sales, periodRange(selectedRange, today)), [inventory.sales, selectedRange, today]);
 
-  const [toast, setToast] = useState(null);
-  const toastTimer = useRef(null);
-
-  const notify = useCallback((message, type = "success") => {
-    setToast({ message, type });
-
-    if (toastTimer.current) {
-      window.clearTimeout(toastTimer.current);
-    }
-
-    toastTimer.current = window.setTimeout(
-      () => setToast(null),
-      3500
-    );
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimer.current) {
-        window.clearTimeout(toastTimer.current);
-      }
-    };
-  }, []);
+  const { toast, notify, dismissToast } = useInventoryNotifications();
 
   const [darkMode, setDarkMode] = useState(() => {
     try {
@@ -231,32 +233,7 @@ export default function InventarioLayout({ userId }) {
         </main>
       </div>
 
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            position: "fixed",
-            right: 24,
-            bottom: 24,
-            zIndex: 1100,
-            maxWidth: "min(380px, calc(100vw - 48px))",
-            padding: "13px 18px",
-            borderRadius: 10,
-            background:
-              toast.type === "error"
-                ? "var(--inventory-danger, #8F1B26)"
-                : "var(--inventory-accent, #E32636)",
-            color: "#FFFFFF",
-            boxShadow: "0 8px 24px rgb(0 0 0 / 22%)",
-            fontFamily: "Inter, sans-serif",
-            fontSize: 14,
-            fontWeight: 600,
-          }}
-        >
-          {toast.message}
-        </div>
-      )}
+      <InventoryToast toast={toast} onDismiss={dismissToast} />
     </div>
   );
 }

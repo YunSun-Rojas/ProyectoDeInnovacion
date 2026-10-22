@@ -84,10 +84,28 @@ test('reportes: pantalla independiente y exportación bloqueada mientras carga',
   await build({configFile:false,root:fileURLToPath(new URL('../',import.meta.url)),plugins:[react()],logLevel:'error',
     build:{ssr:fileURLToPath(new URL('../src/modules/inventario/pages/Reportes.jsx',import.meta.url)),outDir:fileURLToPath(new URL('../dist/reports-ssr',import.meta.url)),emptyOutDir:false,
       rolldownOptions:{external:['react','react/jsx-runtime','react/jsx-dev-runtime','lucide-react','recharts'],output:{entryFileNames:'reports.mjs'}}}});
-  const {default:Reportes}=await import('../dist/reports-ssr/reports.mjs');
+  const {default:Reportes,FlowReportRow}=await import('../dist/reports-ssr/reports.mjs');
+  const row={date:'2026-10-21T04:30:00Z',product:'Monitor de prueba',sku:'EG-TEST-FLUJO-1017',type:'Entrada',origin:'Entrada',entries:3,exits:0,reason:'Ingreso verificado'};
+  const original=structuredClone(row);
+  const renderRow=row=>renderToStaticMarkup(h('table',null,h('tbody',null,h(FlowReportRow,{row}))));
+  const compact=renderRow(row);
+  assert.equal((compact.match(/<td/g)||[]).length,6);
+  assert.equal((compact.match(/>Entrada</g)||[]).length,1);
+  assert.ok(compact.includes('20/10')||compact.includes('2026-10-20'));
+  assert.ok(compact.includes('Monitor de prueba')&&compact.includes('EG-TEST-FLUJO-1017'));
+  assert.match(compact,/>0<\/td>/);
+  assert.deepEqual(row,original);
+  const different=renderRow({...row,type:'Ajuste',origin:'Inventario físico'});
+  assert.ok(different.includes('>Ajuste</span>')&&different.includes('>Inventario físico</span>'));
+  assert.ok(!renderRow({...row,origin:null}).includes('undefined'));
   const html=renderToStaticMarkup(h(Reportes));
   assert.ok(html.includes('Reportes e indicadores'));
   assert.ok(html.includes('Consultando el historial completo autorizado'));
   assert.match(html,/<button[^>]*disabled=""[^>]*>[\s\S]*?Exportar CSV/);
   assert.ok(!html.includes('Registrar movimiento'));
+  assert.ok(html.includes('<h1>Reportes e indicadores</h1>'));
+  for(const removed of ['ALMACÉN · ANÁLISIS DE SOLO LECTURA','Historial registrado, indicadores operativos','Fecha inicial (Lima)','Fecha final (Lima)','Unidades de producto','CSV con todas las filas filtradas','Página 1 de 1']) assert.ok(!html.includes(removed));
+  for(const label of ['Período de análisis','Desde','Hasta','Agrupar por','Detalle del reporte','Ordenar por','0 registros']) assert.ok(html.includes(label));
+  for(const report of ['Entradas y salidas','Mayor rotación por salidas','Productos sin movimiento','Valor actual del inventario','Diferencias de conteos','Sesiones de inventario físico']) assert.ok(html.includes(report));
+  assert.equal((html.match(/type="search"/g)||[]).length,1);
 });

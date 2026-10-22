@@ -32,7 +32,8 @@ ProyectoDeInnovacion/
 │   ├── tests/                # Pruebas aisladas; no intervienen en la aplicación
 │   ├── .env                  # URL y clave de Supabase (no se versiona)
 │   └── package.json
-├── supabase/sql/            # tablas.sql, funciones.sql y politicas.sql
+├── backend/yolo/            # Servicio Python, data/, runs/, pruebas/ y yolov8n.pt
+├── backend/tests/sql/       # SQL conservado para pruebas aisladas
 ├── scripts/dev.mjs          # Inicia frontend y backend juntos
 ├── package.json
 └── package-lock.json
@@ -40,8 +41,8 @@ ProyectoDeInnovacion/
 
 Flujo: **pantalla → /api → backend → Supabase**.
 En el backend: **ruta → middleware de sesión → controlador → servicio → repositorio → Supabase**.
-Los archivos de `supabase/sql/` contienen únicamente comentarios pendientes de las
-definiciones reales; no son migraciones ejecutables. Ver [supabase/README.md](supabase/README.md).
+Los archivos de `backend/tests/sql/` se utilizan en pruebas aisladas con PGlite;
+no son un respaldo completo del esquema remoto ni se aplican al iniciar la aplicación.
 El navegador no importa el SDK de Supabase ni realiza consultas a sus tablas.
 El backend utiliza los permisos de la cuenta autenticada; no usa una clave de administrador.
 
@@ -76,8 +77,15 @@ No se necesitan credenciales de Supabase en el frontend. El proxy de Vite dirige
 
 La aplicación usa la base real. Los datos dentro de `backend/tests/fixtures/`
 solo se utilizan al ejecutar pruebas, nunca para reemplazar datos del servidor.
-Las estimaciones de ventas y reconocimiento visual conservan su alcance anterior;
-esta separación no incorpora un sistema de ventas ni reconocimiento real.
+El reconocimiento visual utiliza el servicio local `backend/yolo/service.py` y el
+modelo `backend/yolo/runs/detect/monitores_v1/weights/best.pt`. Con las dependencias
+de `backend/yolo/requirements.txt` ya instaladas, iniciar desde la raíz con
+`python backend/yolo/service.py`; `npm run dev` no inicia Python.
+El servicio resuelve el modelo desde su propia carpeta, independientemente del directorio actual.
+El dataset, las muestras y los resultados históricos están dentro de `backend/yolo/`.
+Los `args.yaml` conservan las rutas originales como registro histórico; para futuros
+comandos de entrenamiento con `data/imagenes/labeled/data.yaml` y `yolov8n.pt`,
+el directorio de trabajo es `backend/yolo/`. Esta reorganización no reentrena el modelo.
 
 Ver [frontend/README.md](frontend/README.md) para los archivos de interfaz y
 [backend/README.md](backend/README.md) para los archivos del servidor, endpoints y despliegue.

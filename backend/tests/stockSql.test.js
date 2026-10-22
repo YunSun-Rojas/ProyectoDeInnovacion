@@ -7,7 +7,7 @@ import { PGlite } from '@electric-sql/pglite';
 test('Fase 3: transacciones de stock compatibles con RPC reales de Fases 1/2', async t => {
   const db = new PGlite();
   t.after(() => db.close());
-  for (const path of ['./fixtures/catalogDatabase.sql', '../../supabase/sql/20261013_catalog_products.proposed.sql']) await db.exec(await readFile(new URL(path, import.meta.url), 'utf8'));
+  for (const path of ['./fixtures/catalogDatabase.sql', './sql/20261013_catalog_products.proposed.sql']) await db.exec(await readFile(new URL(path, import.meta.url), 'utf8'));
   const actor = '00000000-0000-4000-8000-000000000001';
   await db.query("select set_config('request.jwt.claim.sub',$1,false)", [actor]);
   let counter = 100;
@@ -28,7 +28,7 @@ test('Fase 3: transacciones de stock compatibles con RPC reales de Fases 1/2', a
   const signatures = ['inventory_mutate(uuid,text,bigint,bigint,jsonb)', 'inventory_register_sale(uuid,bigint,bigint,integer,numeric)'];
   const definitions = async () => (await db.query('select pg_get_functiondef(to_regprocedure(s)) def from unnest($1::text[]) s', [signatures])).rows;
   const oldDefinitions = await definitions();
-  await db.exec(await readFile(new URL('../../supabase/sql/20261014_stock_movements.proposed.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('./sql/20261014_stock_movements.proposed.sql', import.meta.url), 'utf8'));
   assert.deepEqual(await snapshot(), oldHistory);
   assert.deepEqual(await definitions(), oldDefinitions);
   await db.exec('set role authenticated');

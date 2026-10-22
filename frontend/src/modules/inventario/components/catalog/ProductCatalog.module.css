@@ -40,8 +40,6 @@
 .actions { display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 22px; margin-top: 24px; }
 .panel [role=alert], .panel [role=status]:not(:empty) { padding: 12px 15px; border-radius: 10px; background: var(--tint); border: 1px solid color-mix(in srgb, #e32636 22%, var(--border)); color: var(--inventory-danger, #ae2433); font-size: 13px; overflow-wrap: anywhere; }
 .panel [role=status]:empty { margin: 0; }
-.image { min-height: 144px; border: 1px dashed var(--inventory-input-border, #dce0e7); border-radius: 12px; background: var(--soft); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); text-align: center; padding: 18px; }
-.image svg { color: var(--inventory-danger, #d72c3c); opacity: .75; }
 .identity { display: grid; grid-template-columns: minmax(130px, 1fr) 2fr; gap: 22px; align-items: center; }
 .panel dl { margin: 0; }
 .panel dl > div { min-width: 0; }
@@ -58,15 +56,16 @@
 .dialog[open] { animation: reveal 240ms cubic-bezier(.2,.75,.3,1); }
 .dialog::backdrop { background: rgb(12 18 28 / 55%); backdrop-filter: blur(3px); }
 .dialog .panel { border: 0; }
+.detailsDialog { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.detailsDialog::-webkit-scrollbar { display: none; }
+.detailsClose { position: sticky; top: 12px; float: right; margin: 12px 12px -48px 0; z-index: 2; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--inventory-border, #e7e9ee); border-radius: 10px; background: var(--inventory-surface, #fff); color: var(--inventory-muted, #687182); cursor: pointer; }
+.detailsClose:focus-visible { outline: 3px solid #ed7b87; outline-offset: 3px; }
+.detailsDialog .productDetails > header { margin-right: 34px; }
 .dialogToolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 20px; position: sticky; top: 0; background: var(--inventory-surface, #fff); border-bottom: 1px solid var(--inventory-border, #e7e9ee); z-index: 1; }
 .dialogToolbar::before { content: 'EAGLE GAMING'; color: var(--inventory-muted, #687182); font: 700 10px/1.5 Inter, system-ui, sans-serif; letter-spacing: .14em; }
 .dialogToolbar button { display: flex; align-items: center; gap: 6px; min-height: 36px; cursor: pointer; border: 1px solid var(--inventory-border, #e7e9ee); background: var(--inventory-surface-alt, #f8f9fb); color: inherit; padding: 8px 12px; border-radius: 9px; font: 600 12px Inter, system-ui, sans-serif; transition: background-color 160ms ease; }
 .dialogToolbar button:hover:not(:disabled) { background: var(--inventory-accent-tint, #fff0f1); }
 .dialogToolbar button:disabled { cursor: not-allowed; opacity: .5; }
-.kardexAction { padding: 0 32px 28px; }
-.kardexAction a { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 12px 16px; border: 1px solid var(--inventory-border, #e7e9ee); border-radius: 10px; color: var(--inventory-danger, #bb2434); background: var(--inventory-accent-tint, #fff0f1); text-decoration: none; font: 600 13px Inter, system-ui, sans-serif; transition: border-color 160ms ease, box-shadow 160ms ease; }
-.kardexAction a:hover { border-color: var(--inventory-danger, #bb2434); box-shadow: 0 3px 10px rgb(227 38 54 / 8%); }
-.kardexAction a:focus-visible { outline: 3px solid #ed7b87; outline-offset: 3px; }
 @keyframes reveal { from { opacity: 0; transform: translateY(10px) scale(.985); } 75% { opacity: 1; transform: translateY(-1px) scale(1.002); } to { opacity: 1; transform: none; } }
 @media (max-width: 560px) {
   .grid, .identity { grid-template-columns: 1fr; gap: 16px; }
@@ -77,4 +76,56 @@
   .dialog { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); }
   .dialogToolbar { padding: 10px 16px; }
 }
-@media (prefers-reduced-motion: reduce) { .panel *, .dialog, .kardexAction a { transition: none !important; animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .panel *, .dialog { transition: none !important; animation: none !important; } }
+
+/* Formulario: estilos acotados para conservar la ficha y otros diálogos. */
+.productForm { padding: 20px 28px 24px; }
+.productForm > header { margin-bottom: 20px; padding-left: 14px; }
+.productForm h2 { margin: 3px 0 5px; }
+.productForm fieldset { margin: 18px 0 0; padding: 0; border: 0; border-radius: 0; background: none; }
+.productForm legend { padding: 0; margin-bottom: 10px; border: 0; background: none; color: var(--inventory-ink, #202735); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.productForm .grid { gap: 12px 18px; }
+.productForm .field { gap: 5px; }
+.productForm :is(input, select, textarea) { padding: 9px 12px; }
+.productForm input[readonly] { background: var(--soft); color: var(--muted); cursor: default; }
+.productForm .actions { position: sticky; bottom: 0; margin-top: 18px; padding: 14px 0 10px; background: var(--inventory-surface, #fff); z-index: 1; }
+.moneyInput { position: relative; }
+.moneyInput > span { position: absolute; inset: 0 auto 0 13px; display: flex; align-items: center; color: var(--muted); font-size: 13px; font-weight: 700; pointer-events: none; }
+.productForm .moneyInput input { padding-left: 40px; font-variant-numeric: tabular-nums; }
+.formDialog { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; -ms-overflow-style: none; }
+.formDialog::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.formDialog[open] { animation: productEnter 180ms ease-out both; }
+.formDialog::backdrop { animation: productFadeIn 180ms ease-out both; }
+@keyframes productEnter { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes productFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.formDialog.formClosing { animation: productLeave 140ms ease-in both; }
+.formClosing::backdrop { animation: productFadeOut 140ms ease-in both; }
+@keyframes productLeave { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(6px) scale(.98); } }
+@keyframes productFadeOut { from { opacity: 1; } to { opacity: 0; } }
+@media (max-width: 560px) {
+  .productForm { padding: 16px; }
+  .productForm .grid { gap: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .formDialog[open], .formDialog.formClosing, .formDialog::backdrop { animation: none; } }
+
+.productDetails > header { margin-bottom: 20px; }
+.productDetails section { margin: 20px 0 0; padding: 0; border: 0; border-radius: 0; }
+.productDetails h3 { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 12px; }
+.productDetails .grid { gap: 12px 18px; }
+.productDetails .description { margin: 0; padding: 12px; }
+.deleteDialog { width: min(440px, calc(100vw - 32px)); padding: 28px; font: 14px/1.6 Inter, system-ui, sans-serif; text-align: center; }
+.deleteDialog[open] { animation: productEnter 180ms ease-out both; }
+.deleteDialog.formClosing { animation: productLeave 140ms ease-in both; }
+.deleteDialog h2 { margin: 0 0 14px; font-size: 22px; letter-spacing: -.025em; }
+.deleteDialog p { overflow-wrap: anywhere; }
+.deleteHint { font-size: 12px; color: var(--inventory-muted, #687182); }
+.deleteIcon { display: grid; place-items: center; width: 50px; height: 50px; margin: 0 auto 18px; border-radius: 50%; color: var(--inventory-danger, #bb2434); background: var(--inventory-accent-tint, #fff0f1); }
+.deleteActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.deleteActions button { flex: 1 1 140px; cursor: pointer; }
+.deleteActions button:disabled { opacity: .65; cursor: default; }
+.deleteActions button:focus-visible { outline: 3px solid #ed7b87; outline-offset: 3px; }
+.deleteClose { position: absolute; top: 12px; right: 12px; display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--inventory-border, #e7e9ee); border-radius: 9px; color: var(--inventory-muted, #687182); background: var(--inventory-surface-alt, #f8f9fb); cursor: pointer; }
+.deleteClose:focus-visible { outline: 3px solid #ed7b87; outline-offset: 2px; }
+.deleteClose:disabled { opacity: .5; cursor: default; }
+@media (max-width: 400px) { .deleteDialog { padding: 22px 18px; } }
+@media (prefers-reduced-motion: reduce) { .deleteDialog[open], .deleteDialog.formClosing, .deleteDialog::backdrop { animation: none; } }

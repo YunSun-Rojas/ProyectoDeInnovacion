@@ -69,8 +69,9 @@ La API mantiene modo de lectura si el proyecto aún no habilita escrituras.
 
 La acción `sale` recibe `requestId`, `productId`, `version` y
 `data: { quantity, unitPrice }`. Usa `inventory_register_sale` para descontar stock
-y guardar el precio histórico en una sola transacción. Requiere instalar
-`supabase/sql/ventas.sql` según `supabase/README.md`. La consulta de inventario
+y guardar el precio histórico en una sola transacción. Requiere las funciones de
+ventas habilitadas en Supabase; `backend/tests/sql/ventas.sql` se conserva como
+entrada de las pruebas aisladas, no se ejecuta al iniciar la API. La consulta de inventario
 incluye `sales` y `salesEnabled`; una función aún no instalada deshabilita ventas
 sin impedir consultar el inventario existente.
 

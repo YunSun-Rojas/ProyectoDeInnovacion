@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import SaleDialog from "../components/SaleDialog";
 import ProductDetailsDialog from "../components/catalog/ProductDetailsDialog";
@@ -15,7 +15,6 @@ import {
   X,
   Package,
   Boxes,
-  Wallet,
   Download,
   ChevronLeft,
   ChevronRight,
@@ -53,6 +52,23 @@ const STATUS_LABELS = {
   bajo: "Stock bajo",
   normal: "Disponible",
 };
+
+function matchesStockFilter(product, filter, fallback) {
+  const state = stockStatus(product, fallback);
+  if (["sin-stock", "bajo", "normal"].includes(filter)) return state === filter;
+  if (filter === "alertas") return state !== "normal";
+  if (filter === "disponible") return numeric(product.stock) > 0;
+  if (filter === "vendidos") return numeric(product.unitsSoldThisMonth) > 0;
+  return true;
+}
+
+function recentlyAdded(a, b) {
+  const left = Date.parse(a.createdAt), right = Date.parse(b.createdAt);
+  if (Number.isFinite(left) && Number.isFinite(right) && left !== right) return right - left;
+  if (Number.isFinite(left) !== Number.isFinite(right)) return Number.isFinite(left) ? -1 : 1;
+  return String(b.id ?? '').localeCompare(String(a.id ?? ''), 'es', { numeric: true })
+    || String(a.sku ?? '').localeCompare(String(b.sku ?? ''), 'es');
+}
 
 function summarize(products) {
   return products.reduce(
@@ -690,6 +706,7 @@ export default function Productos({
   notify = () => {},
   currentUser = null,
   getCreatedBy = defaultAuthor,
+  getConfirmedChange,
 }) {
   const [params, setParams] = useSearchParams();
 
@@ -697,11 +714,14 @@ export default function Productos({
   const category = params.get("categoria") || "Todas";
   const status = params.get("estado") || "";
 
-  const [sort, setSort] = useState("name");
+  const [sort, setSort] = useState("recent");
+  const [createdProduct, setCreatedProduct] = useState(null);
+  const creationDraft = useRef(null);
   const [pageSize, setPageSize] = useState(15);
   const [modal, setModal] = useState(() => params.get("accion") === "nuevo" && !readOnly ? { product: null, trigger: null } : null);
   const [saleOpen, setSaleOpen] = useState(false);
   const [detailId, setDetailId] = useState(null);
+  const [deletion, setDeletion] = useState(null);
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState("");
 
@@ -709,6 +729,12 @@ export default function Productos({
   const newButton = useRef(null);
 
   const busy = saving || pending;
+
+  useEffect(() => {
+    if (((modal && !modal.closing) || (deletion && !deletion.closing)) && !busy && (writeError || actionError)) {
+      notify(writeError || actionError, 'error');
+    }
+  }, [modal, deletion, busy, writeError, actionError, notify]);
 
   const canCreate =
     !readOnly && !busy && !uncertain && typeof onAdd === "function";
@@ -745,28 +771,17 @@ export default function Productos({
       const matchesCategory =
         category === "Todas" || product.category === category;
 
-      const state = stockStatus(product, defaultMinStock);
-
-      let matchesStatus = true;
-
-      if (status === "sin-stock") {
-        matchesStatus = state === "sin-stock";
-      } else if (status === "bajo") {
-        matchesStatus = state === "bajo";
-      } else if (status === "normal") {
-        matchesStatus = state === "normal";
-      } else if (status === "alertas") {
-        matchesStatus = state !== "normal";
-      } else if (status === "disponible") {
-        matchesStatus = numeric(product.stock) > 0;
-      } else if (status === "vendidos") {
-        matchesStatus = numeric(product.unitsSoldThisMonth) > 0;
-      }
+      const matchesStatus = matchesStockFilter(product, status, defaultMinStock);
 
       return matchesQuery && matchesCategory && matchesStatus;
     });
 
     return result.sort((a, b) => {
+      if (sort === "recent") {
+        const isCreated = item => createdProduct && (createdProduct.id != null ? String(item.id) === String(createdProduct.id) : item.sku === createdProduct.sku);
+        if (Boolean(isCreated(a)) !== Boolean(isCreated(b))) return isCreated(a) ? -1 : 1;
+        return recentlyAdded(a, b);
+      }
       if (sort === "stock-asc") {
         return numeric(a.stock) - numeric(b.stock);
       }
@@ -787,7 +802,7 @@ export default function Productos({
         "es"
       );
     });
-  }, [products, query, category, status, defaultMinStock, sort]);
+  }, [products, query, category, status, defaultMinStock, sort, createdProduct]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const requestedPage = Number(params.get("pagina") || 1);
@@ -860,6 +875,10 @@ export default function Productos({
   function closeModal() {
     if (busyRef.current || saving || uncertain) return;
 
+    setModal(previous => previous ? { ...previous, closing: true } : null);
+  }
+
+  function finishCloseModal() {
     const trigger = modal?.trigger || newButton.current;
     setModal(null);
     clearCreateAction();
@@ -879,11 +898,24 @@ export default function Productos({
 
       // Conserva el contrato de tus callbacks originales.
       if (result) {
-        if (close) {
-          const trigger = modal?.trigger;
-          setModal(null);
-          clearCreateAction();
-          requestAnimationFrame(() => trigger?.focus());
+        if (close === true && modal && !modal.product) {
+          const receipt = getConfirmedChange?.();
+          const created = receipt?.action === 'add' && receipt.product ? receipt.product : creationDraft.current;
+          setCreatedProduct(created);
+          setSort('recent');
+          setParams(previous => {
+            const next = new URLSearchParams(previous);
+            next.delete('pagina');
+            if (!created || ![created.name, created.sku].some(value => String(value ?? '').toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es')))) next.delete('q');
+            if (!created || (category !== 'Todas' && created.category !== category)) next.delete('categoria');
+            if (!created || !matchesStockFilter(created, status, defaultMinStock)) next.delete('estado');
+            return next;
+          }, { replace: true });
+        }
+        if (close === 'delete') {
+          setDeletion(previous => previous ? { ...previous, closing: true } : null);
+        } else if (close) {
+          setModal(previous => previous ? { ...previous, closing: true } : null);
         }
 
         notify(message);
@@ -968,20 +1000,13 @@ export default function Productos({
       detail: "Suma del stock registrado",
       icon: Boxes,
     },
-    {
-      title: "Valorizado",
-      value: money(summary.value),
-      detail: "Stock × precio registrado",
-      icon: Wallet,
-    },
   ];
 
   return (
-    <main className={`inv-page ${ui.workspace}`}>
+    <main className={`inv-page ${ui.workspace} ${ui.productsPage}`}>
       <style>{STYLES}</style>
       <header className="inv-header">
         <div>
-          <span className="inv-eyebrow">CATÁLOGO</span>
           <h1>Catálogo de productos</h1>
         </div>
 
@@ -1012,12 +1037,8 @@ export default function Productos({
 
       <section
         className="inv-summary"
-        aria-labelledby="inventory-summary-title"
+        aria-label="Resumen de productos"
       >
-        <div className="inv-section-heading">
-          <h2 id="inventory-summary-title">Resumen general</h2>
-          <span>Todo el inventario · independiente de los filtros</span>
-        </div>
 
         <div className="inv-summary-grid">
           {cards.map(({ title, value, detail, icon: Icon }) => (
@@ -1037,7 +1058,7 @@ export default function Productos({
       </section>
 
       <section className="inv-panel" aria-label="Listado de productos">
-        <div className="inv-toolbar">
+        <div className={`inv-toolbar ${ui.productFilters}`}>
           <div className="inv-search">
             <Search size={17} aria-hidden="true" />
             
@@ -1114,6 +1135,7 @@ export default function Productos({
                 setFilter("pagina", "");
               }}
             >
+              <option value="recent">Agregados recientemente</option>
               <option value="name">Nombre A–Z</option>
               <option value="stock-asc">Menor stock</option>
               <option value="stock-desc">Mayor stock</option>
@@ -1145,7 +1167,7 @@ export default function Productos({
           )}
         </div>
 
-        {(writeError || actionError) && (
+        {!modal && !deletion && (writeError || actionError) && (
           <div role="alert" className="inv-error">
             {writeError || actionError}
 
@@ -1177,7 +1199,6 @@ export default function Productos({
                 <th scope="col" className="inv-number">Precio unit.</th>
                 <th scope="col" className="inv-number">Valorizado</th>
                 <th scope="col">Estado</th>
-                <th scope="col" className="inv-number">Registrado por</th>
                 <th scope="col" className="inv-number">Acciones</th>
               </tr>
             </thead>
@@ -1185,7 +1206,6 @@ export default function Productos({
             <tbody>
               {rows.map((product) => {
                 const state = stockStatus(product, defaultMinStock);
-                const author = getCreatedBy(product);
 
                 return (
                   <tr key={product.id}>
@@ -1223,12 +1243,6 @@ export default function Productos({
                     </td>
 
                     <td className="inv-number">
-                      <span className="inv-author" title={author}>
-                        {author}
-                      </span>
-                    </td>
-
-                    <td className="inv-number">
                       <div className="inv-row-actions">
                         <button type="button" aria-label={`Ver ficha de ${product.name}`} title="Ver ficha del producto"
                           onClick={() => setDetailId(product.id)}>
@@ -1250,18 +1264,7 @@ export default function Productos({
                           className="inv-delete"
                           aria-label={`Eliminar ${product.name}`}
                           title="Eliminar producto"
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                `¿Eliminar el producto ${product.name}?`
-                              )
-                            ) {
-                              runWrite(
-                                () => onDelete(product),
-                                "Producto eliminado correctamente."
-                              );
-                            }
-                          }}
+                          onClick={event => { setActionError(''); setDeletion({ product, trigger: event.currentTarget }); }}
                         >
                           <Trash2 size={15} />
                         </button>
@@ -1273,7 +1276,7 @@ export default function Productos({
 
               {!rows.length && (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={7}>
                     <div className="inv-empty">
                       <Package size={28} />
                       <strong>
@@ -1336,24 +1339,24 @@ export default function Productos({
 
             <button
               type="button"
-              className="inv-button inv-icon"
+              className="inv-button"
               aria-label="Página anterior"
               disabled={page === 1}
               onClick={() => setFilter("pagina", String(page - 1))}
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft size={16} aria-hidden="true" /> Anterior
             </button>
 
-            <span>{page} / {pages}</span>
+            <span aria-live="polite">Página {page} de {pages}</span>
 
             <button
               type="button"
-              className="inv-button inv-icon"
+              className="inv-button"
               aria-label="Página siguiente"
               disabled={page === pages}
               onClick={() => setFilter("pagina", String(page + 1))}
             >
-              <ChevronRight size={16} />
+              Siguiente <ChevronRight size={16} aria-hidden="true" />
             </button>
           </div>
         </footer>
@@ -1366,6 +1369,16 @@ export default function Productos({
       {detailId !== null && <ProductDetailsDialog product={products.find(product => product.id === detailId)}
         onClose={() => setDetailId(null)} />}
 
+      {deletion && <DeleteProductDialog product={deletion.product} busy={busy} uncertain={uncertain}
+        closing={Boolean(deletion.closing)} error={writeError || actionError}
+        onDismiss={() => { if (!busyRef.current && !saving && !uncertain) setDeletion(previous => ({ ...previous, closing: true })); }}
+        onClosed={() => {
+          const trigger = deletion.trigger?.isConnected ? deletion.trigger : newButton.current;
+          setDeletion(null); requestAnimationFrame(() => trigger?.focus());
+        }}
+        onConfirm={() => runWrite(() => onDelete(deletion.product), 'Producto eliminado con éxito', 'delete')}
+        onRetry={typeof retryWrite === 'function' ? () => runWrite(retryWrite, 'Producto eliminado con éxito', 'delete') : null} />}
+
       {modal && !readOnly && (
         <ProductModal
           product={modal.product}
@@ -1374,42 +1387,100 @@ export default function Productos({
           defaultMinStock={defaultMinStock}
           currentUser={currentUser}
           getCreatedBy={getCreatedBy}
-          busy={busy}
+          busy={busy || modal.closing}
+          closing={Boolean(modal.closing)}
           uncertain={uncertain}
           error={writeError || actionError}
           onClose={closeModal}
+          onClosed={finishCloseModal}
           onRetry={
             typeof retryWrite === "function"
               ? () =>
                   runWrite(
                     retryWrite,
-                    "Operación confirmada.",
+                    modal.product ? "Producto actualizado correctamente." : "El producto fue creado con éxito",
                     true
                   )
               : null
           }
-          onSave={(data) =>
-            runWrite(
+          onSave={(data) => {
+            if (!modal.product) creationDraft.current = data;
+            return runWrite(
               () =>
                 modal.product
                   ? onEdit(modal.product, data)
                   : onAdd(data),
               modal.product
                 ? "Producto actualizado correctamente."
-                : "Producto registrado correctamente.",
+                : "El producto fue creado con éxito",
               true
-            )
-          }
+            );
+          }}
         />
       )}
     </main>
   );
 }
 
+export function DeleteProductDialog({ product, busy, uncertain, closing, error, onConfirm, onRetry, onDismiss, onClosed }) {
+  const dialog = useRef(null);
+  const cancel = useRef(null);
+  const locked = useRef(false);
+  const [pending, setPending] = useState(false);
+  const [localError, setLocalError] = useState('');
+  const id = useId();
+  const waiting = busy || pending;
+  const disabled = waiting || uncertain || closing;
+  useEffect(() => {
+    const element = dialog.current;
+    const trigger = document.activeElement;
+    const overflow = document.body.style.overflow;
+    element.showModal(); cancel.current?.focus(); document.body.style.overflow = 'hidden';
+    return () => { element.close(); document.body.style.overflow = overflow;
+      if (trigger?.isConnected) trigger.focus({ preventScroll: true }); };
+  }, []);
+  useEffect(() => {
+    if (!closing) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { onClosed(); return; }
+    const timer = window.setTimeout(onClosed, 180);
+    return () => window.clearTimeout(timer);
+  }, [closing, onClosed]);
+  async function confirm(retry = false) {
+    if (locked.current || waiting || closing || (uncertain && !retry)) return;
+    locked.current = true; setPending(true); setLocalError('');
+    try { await (retry ? onRetry() : onConfirm()); }
+    catch (reason) { setLocalError(reason?.message || 'No se pudo confirmar la eliminación.'); }
+    finally { locked.current = false; setPending(false); }
+  }
+  return <dialog ref={dialog} className={`${catalogStyles.dialog} ${catalogStyles.deleteDialog}${closing ? ` ${catalogStyles.formClosing}` : ''}`}
+    aria-labelledby={`${id}-title`} aria-describedby={`${id}-question ${id}-consequence`} aria-busy={Boolean(waiting)}
+    onCancel={event => { event.preventDefault(); if (!disabled) onDismiss(); }}
+    onClick={event => {
+      if (event.target !== event.currentTarget || disabled) return;
+      const bounds = event.currentTarget.getBoundingClientRect();
+      if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onDismiss();
+    }}
+    onAnimationEnd={event => { if (closing && event.target === event.currentTarget) onClosed(); }}>
+    <button type="button" className={catalogStyles.deleteClose} aria-label="Cerrar confirmación" disabled={disabled} onClick={onDismiss}><X size={18} aria-hidden="true" /></button>
+    <div className={catalogStyles.deleteIcon}><Trash2 size={24} aria-hidden="true" /></div>
+    <h2 id={`${id}-title`}>Eliminar producto</h2>
+    <p id={`${id}-question`}>¿Estás seguro de que deseas eliminar el producto <strong>{product.name}</strong>?</p>
+    <p id={`${id}-consequence`} className={catalogStyles.deleteHint}></p>
+    {(error || localError) && <p role="alert" className={ui.alert}>{error || localError}</p>}
+    {uncertain && <p className={catalogStyles.deleteHint}>Confirmación pendiente. Reintenta la misma operación para comprobarla sin duplicarla.</p>}
+    <div className={catalogStyles.deleteActions}>
+      <button ref={cancel} type="button" className={ui.secondary} disabled={disabled} onClick={onDismiss}>Cancelar</button>
+      <button type="button" className={`${ui.primary} ${ui.savingButton}`} aria-busy={Boolean(waiting)} disabled={waiting || closing || (uncertain && !onRetry)}
+        onClick={() => confirm(Boolean(uncertain))}>{waiting ? 'Eliminando…' : uncertain ? 'Reintentar eliminación' : 'Eliminar producto'}</button>
+    </div>
+  </dialog>;
+}
+
 // ─── Formulario de registro / edición ────────────────────────
 
 function ProductModal({
   product,
+  currentUser,
   categories,
   products,
   defaultMinStock,
@@ -1419,9 +1490,19 @@ function ProductModal({
   onClose,
   onSave,
   onRetry,
+  closing,
+  onClosed,
 }) {
   const dialog = useRef(null);
   const disabled = busy || uncertain;
+
+  useEffect(() => {
+    if (!closing) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { onClosed(); return; }
+    // Respaldo si el navegador desactiva las animaciones.
+    const timer = window.setTimeout(onClosed, 180);
+    return () => window.clearTimeout(timer);
+  }, [closing, onClosed]);
 
   useEffect(() => {
     const element = dialog.current;
@@ -1444,7 +1525,8 @@ function ProductModal({
   return (
     <dialog
       ref={dialog}
-      className={catalogStyles.dialog}
+      className={`${catalogStyles.dialog} ${catalogStyles.formDialog}${closing ? ` ${catalogStyles.formClosing}` : ''}`}
+      onAnimationEnd={event => { if (closing && event.target === event.currentTarget) onClosed(); }}
       aria-label={product ? "Editar producto" : "Nuevo producto"}
       onCancel={(event) => {
         event.preventDefault();
@@ -1467,10 +1549,10 @@ function ProductModal({
 
       <ProductForm
         product={product}
+        currentUser={currentUser}
         products={products}
         categories={categories}
         defaultMinStock={defaultMinStock}
-        canReadPurchaseCost
         onSave={onSave}
         onRetry={onRetry}
         busy={busy}

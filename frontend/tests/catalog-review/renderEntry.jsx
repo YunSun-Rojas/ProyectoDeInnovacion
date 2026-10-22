@@ -1,2 +1,11 @@
 export { default as ProductForm } from '../../src/modules/inventario/components/catalog/ProductForm';
 export { default as ProductDetails } from '../../src/modules/inventario/components/catalog/ProductDetails';
+export { default as ProductDetailsDialog } from '../../src/modules/inventario/components/catalog/ProductDetailsDialog';
+export { InventoryToast } from '../../src/modules/inventario/InventarioLayout';
+export { default as Productos, DeleteProductDialog } from '../../src/modules/inventario/pages/Productos';
+export { default as Existencias, StockHistoryDialog, StockMovementFacts } from '../../src/modules/inventario/pages/Existencias';
+export { default as StockDialog } from '../../src/modules/inventario/components/StockDialog';
+export { default as Historial } from '../../src/modules/inventario/pages/Historial';
+export { default as InventarioFisico } from '../../src/modules/inventario/pages/InventarioFisico';
+export { default as Prediccion } from '../../src/modules/inventario/pages/Prediccion';
+export { default as Vision } from '../../src/modules/inventario/pages/Vision';

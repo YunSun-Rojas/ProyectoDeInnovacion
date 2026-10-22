@@ -25,8 +25,8 @@ function LoginRoute({ session }) {
 function DashboardRoute() {
   return <Dashboard {...useOutletContext()} />;
 }
-function ProductosRoute() {
-  return <Productos {...useOutletContext()} />;
+function ProductosRoute({ currentUser }) {
+  return <Productos {...useOutletContext()} currentUser={currentUser} />;
 }
 function PrediccionRoute() {
   return <Prediccion {...useOutletContext()} />;
@@ -46,7 +46,7 @@ export default function App() {
       <Route path="/login" element={<LoginRoute session={session} />} />
       <Route path="/dashboard" element={<RequireSession session={session} />}>
         <Route index element={<DashboardRoute />} />
-        <Route path="productos" element={<ProductosRoute />} />
+        <Route path="productos" element={<ProductosRoute currentUser={session?.user} />} />
         <Route path="prediccion" element={<PrediccionRoute />} />
         <Route path="vision" element={<Vision />} />
         <Route path="existencias" element={<Existencias />} />
