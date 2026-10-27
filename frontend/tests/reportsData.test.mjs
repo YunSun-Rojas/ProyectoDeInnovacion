@@ -79,11 +79,11 @@ test('reportes: CSV seguro con comillas, separadores, saltos, fórmulas y negati
 });
 
 test('reportes: pantalla independiente y exportación bloqueada mientras carga',async()=>{
-  const [{build},{default:react},{createElement:h},{renderToStaticMarkup},{fileURLToPath}]=await Promise.all([
-    import('vite'),import('@vitejs/plugin-react'),import('react'),import('react-dom/server'),import('node:url')]);
+  const [{build},{default:react},{createElement:h},{renderToStaticMarkup},{fileURLToPath},{MemoryRouter,Routes,Route,Outlet}]=await Promise.all([
+    import('vite'),import('@vitejs/plugin-react'),import('react'),import('react-dom/server'),import('node:url'),import('react-router-dom')]);
   await build({configFile:false,root:fileURLToPath(new URL('../',import.meta.url)),plugins:[react()],logLevel:'error',
     build:{ssr:fileURLToPath(new URL('../src/modules/inventario/pages/Reportes.jsx',import.meta.url)),outDir:fileURLToPath(new URL('../dist/reports-ssr',import.meta.url)),emptyOutDir:false,
-      rolldownOptions:{external:['react','react/jsx-runtime','react/jsx-dev-runtime','lucide-react','recharts'],output:{entryFileNames:'reports.mjs'}}}});
+      rolldownOptions:{external:['react','react/jsx-runtime','react/jsx-dev-runtime','react-router-dom','lucide-react','recharts'],output:{entryFileNames:'reports.mjs'}}}});
   const {default:Reportes,FlowReportRow}=await import('../dist/reports-ssr/reports.mjs');
   const row={date:'2026-10-21T04:30:00Z',product:'Monitor de prueba',sku:'EG-TEST-FLUJO-1017',type:'Entrada',origin:'Entrada',entries:3,exits:0,reason:'Ingreso verificado'};
   const original=structuredClone(row);
@@ -100,7 +100,9 @@ test('reportes: pantalla independiente y exportación bloqueada mientras carga',
   assert.ok(!renderRow({...row,origin:null}).includes('undefined'));
   const html=renderToStaticMarkup(h(Reportes));
   assert.ok(html.includes('Reportes e indicadores'));
-  assert.ok(html.includes('Consultando el historial completo autorizado'));
+  assert.ok(!html.includes('Consultando el historial completo autorizado'));
+  assert.ok(html.includes('Actualizando…'));
+  assert.ok(html.includes('aria-busy="true"'));
   assert.match(html,/<button[^>]*disabled=""[^>]*>[\s\S]*?Exportar CSV/);
   assert.ok(!html.includes('Registrar movimiento'));
   assert.ok(html.includes('<h1>Reportes e indicadores</h1>'));
@@ -108,4 +110,7 @@ test('reportes: pantalla independiente y exportación bloqueada mientras carga',
   for(const label of ['Período de análisis','Desde','Hasta','Agrupar por','Detalle del reporte','Ordenar por','0 registros']) assert.ok(html.includes(label));
   for(const report of ['Entradas y salidas','Mayor rotación por salidas','Productos sin movimiento','Valor actual del inventario','Diferencias de conteos','Sesiones de inventario físico']) assert.ok(html.includes(report));
   assert.equal((html.match(/type="search"/g)||[]).length,1);
+  const loadingHtml=renderToStaticMarkup(h(MemoryRouter,null,h(Routes,null,h(Route,{element:h(Outlet,{context:{status:'loading'}})},h(Route,{path:'/',element:h(Reportes)})))));
+  assert.ok(loadingHtml.includes('Cargando reportes…'));
+  assert.ok(!loadingHtml.includes('<h1>Reportes e indicadores</h1>'));
 });

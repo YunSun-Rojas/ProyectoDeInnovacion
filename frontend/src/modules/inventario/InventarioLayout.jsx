@@ -5,6 +5,7 @@ import { DATE_RANGES, limaDate, periodRange, summarizeMovements } from './pages/
 import { summarizeSales } from './pages/salesData';
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
+import InventoryLoading from './components/InventoryLoading';
 import { useInventory, useInventoryNotifications } from "./hooks/useInventory";
 import s from "./pages/Management.module.css";
 import ui from './pages/InventoryUI.module.css';
@@ -141,7 +142,7 @@ export default function InventarioLayout({ userId }) {
       style={{
         display: "flex",
         width: "100%",
-        height: "100dvh",
+        height: "100%",
         overflow: "hidden",
       }}
     >
@@ -202,18 +203,14 @@ export default function InventarioLayout({ userId }) {
                 notify,
               }}
             />
+          ) : status === "loading" ? (
+            <InventoryLoading />
           ) : (
             <div className={s.page}>
               <section
                 className={s.card}
                 aria-busy={status === "loading"}
               >
-                {status === "loading" ? (
-                  <p className={s.muted} role="status">
-                    Cargando inventario…
-                  </p>
-                ) : (
-                  <>
                     <p className={s.formError} role="alert">
                       {error}
                     </p>
@@ -225,8 +222,6 @@ export default function InventarioLayout({ userId }) {
                     >
                       Reintentar
                     </button>
-                  </>
-                )}
               </section>
             </div>
           )}

@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
+import InventoryLoading from '../components/InventoryLoading';
 import { AlertTriangle, PackageX, RefreshCw, Plus, Info, X, BookOpen } from 'lucide-react';
 import { summarizeInventory } from './dashboardData';
 import { confirmedStockChange, movementQuantity, productMovements, recentStockMovements } from './existenciasData';
@@ -94,7 +95,7 @@ export default function Existencias() {
   const latest = useMemo(() => readOnly ? [] : recentStockMovements(movements, products, confirmedMovement, today), [movements, products, readOnly, confirmedMovement, today]);
   const summary = useMemo(() => summarizeInventory(products, defaultMinStock), [products, defaultMinStock]);
   function closeStock() { setStockOpen(false); setParams(previous => { const next = new URLSearchParams(previous); next.delete('accion'); next.delete('producto'); return next; }, { replace: true }); }
-  if (status === 'loading') return <div className={s.page} role="status">Cargando existencias…</div>;
+  if (status === 'loading') return <InventoryLoading label="Cargando existencias…" />;
   if (status === 'error') return <div className={s.page}><p className={s.formError} role="alert">{error}</p><button className={s.button} onClick={retry}>Reintentar</button></div>;
   return <div className={`${s.page} ${ui.workspace} ${styles.workspace}`}>
     <header className={`${s.header} ${ui.heading} ${styles.heading}`}><div><h1 className={s.title}>Control de existencias</h1></div><div className={s.companyActions}><button className={`${ui.secondary} ${styles.refreshButton}`} aria-busy={Boolean(refreshing)} disabled={saving || uncertain} onClick={retry}><RefreshCw size={15} aria-hidden="true" />{refreshing ? 'Actualizando…' : 'Actualizar'}</button><button className={ui.primary} disabled={readOnly || !stockEnabled || saving || uncertain || !products.length} onClick={() => { previousRequest.current = getConfirmedChange?.()?.requestId; setStockOpen(true); }}><Plus size={16} aria-hidden="true" />Registrar movimiento</button></div></header>

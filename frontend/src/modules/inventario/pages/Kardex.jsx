@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
+import InventoryLoading from '../components/InventoryLoading';
 import { BookOpen, Download, RefreshCw, Search, AlertTriangle, ChevronLeft, ChevronRight, Scale, ArrowDownLeft, ArrowUpRight, CircleCheck } from 'lucide-react';
 import { buildKardex, kardexProducts, kardexPage, kardexCsv, kardexDate, kardexToday, limaDay } from './kardexData';
 import s from './Management.module.css';
@@ -73,7 +74,7 @@ export default function Kardex() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  if (status === 'loading') return <div className={`${s.page} ${ui.workspace}`} role="status">Cargando Kardex…</div>;
+  if (status === 'loading') return <InventoryLoading label="Cargando Kardex…" />;
   if (status === 'error') return <div className={`${s.page} ${ui.workspace}`}><p className={ui.alert} role="alert">{error}</p><button className={ui.secondary} onClick={retry}>Reintentar consulta</button></div>;
   return <div className={`${s.page} ${ui.workspace} ${k.workspace}`}>
     <header className={`${s.header} ${ui.heading} ${k.heading}`}><div><h1>Kardex de inventario</h1></div>

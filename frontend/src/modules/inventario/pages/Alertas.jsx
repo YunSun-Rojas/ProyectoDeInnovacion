@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
 import { Bell, AlertTriangle, PackageX, ClipboardCheck, RefreshCw, ArrowLeft, ArrowRight } from 'lucide-react';
+import InventoryLoading from '../components/InventoryLoading';
 import { loadPendingDifferences } from '../api/inventoryApi';
 import { buildAlerts, filterAlerts, STOCK_LABELS } from './alertsData';
 import s from './Management.module.css';
@@ -12,7 +13,7 @@ const labels = { ...STOCK_LABELS, diferencia: 'Diferencia pendiente' };
 const icons = { agotado: PackageX, bajo: AlertTriangle, diferencia: ClipboardCheck };
 
 export default function Alertas() {
-  const { products = [], retry, refreshing, saving, uncertain, readOnly, stockEnabled, status = 'ready', error: inventoryError } = useOutletContext();
+  const { products = [], retry, refreshing, saving, uncertain, readOnly, stockEnabled, status = 'ready', error: inventoryError } = useOutletContext() || {};
   const [params, setParams] = useSearchParams();
   const refreshInventory = useRef(retry);
   useEffect(() => { refreshInventory.current = retry; }, [retry]);
@@ -32,7 +33,7 @@ export default function Alertas() {
     loadPendingDifferences(controller.signal).then(data => {
       if (!controller.signal.aborted) { setPending(data); setLoading(false); }
     }).catch(e => {
-      if (!controller.signal.aborted) { setError(e.message); setPending(null); setLoading(false); }
+      if (!controller.signal.aborted) { setError(e.message); setLoading(false); }
     });
     return () => controller.abort();
   }, [attempt]);
@@ -48,16 +49,16 @@ export default function Alertas() {
   const differencesKnown = pending?.enabled === true && !loading && !error;
   const canRegister = stockEnabled && !readOnly && !saving && !uncertain && status === 'ready';
   function update(setter, value) { setter(value); setPage(1); }
-  function refresh() { setLoading(true); setError(''); setPending(null); setAttempt(n => n + 1); }
+  function refresh() { setLoading(true); setError(''); setAttempt(n => n + 1); }
   function clearFilters() { setQuery(''); setCategory(''); setState(''); setPriority(''); setPage(1); }
+  if (status === 'loading') return <InventoryLoading label="Cargando alertas…" />;
   return <div className={`${s.page} ${ui.workspace} ${styles.workspace}`} aria-busy={busy}>
-    <header className={`${s.header} ${ui.heading} ${styles.heading}`}><div><h1>Alertas y notificaciones</h1></div><button className={ui.secondary} disabled={busy || uncertain} onClick={refresh}><RefreshCw size={16} aria-hidden="true" />{busy ? 'Actualizando…' : 'Actualizar'}</button></header>
+    <header className={`${s.header} ${ui.heading} ${styles.heading}`}><div><h1>Alertas y notificaciones</h1></div><button className={ui.secondary} aria-busy={Boolean(busy)} disabled={busy || uncertain} onClick={refresh}>{busy ? <InventoryLoading compact label="Actualizando…" /> : <RefreshCw size={16} aria-hidden="true" />}{busy ? 'Actualizando…' : 'Actualizar'}</button></header>
     {uncertain && <p className={ui.notice} role="status">Hay un movimiento pendiente de confirmar. Resuélvelo en <Link to="/dashboard/existencias">Existencias</Link> antes de actualizar el stock de referencia de las alertas.</p>}
-    {busy && <p className={ui.notice} role="status">Consultando información actual de inventario…</p>}
     {(error || inventoryError || dataError) && <div className={ui.alert} role="alert">{error || inventoryError || dataError} Las diferencias no disponibles no se interpretan como cero.</div>}
     {pending?.enabled === false && <p className={ui.notice} role="status">Las diferencias pendientes requieren habilitar las tablas y políticas de Inventario físico (Fase 5). Las alertas de stock siguen disponibles.</p>}
     <section className={`${styles.cards} ${ui.summary}`} aria-label="Resumen de alertas">
-      {[['bajo','Stock bajo',AlertTriangle],['agotado','Agotados',PackageX],['diferencias','Diferencias pendientes',ClipboardCheck]].map(([key,label,Icon]) => <article key={key} data-state={key} className={styles.card}><div><Icon size={20} aria-hidden="true" />{label}</div><strong>{key === 'diferencias' && !differencesKnown || !result ? '—' : result.summary[key]}</strong></article>)}
+      {[['bajo','Stock bajo',AlertTriangle],['agotado','Agotados',PackageX],['diferencias','Diferencias pendientes',ClipboardCheck]].map(([key,label,Icon]) => <article key={key} data-state={key} className={styles.card}><div><Icon size={20} aria-hidden="true" />{label}</div><strong>{key === 'diferencias' && (!pending || pending.enabled === false) || !result ? '—' : result.summary[key]}</strong></article>)}
     </section>
     <div className={`${s.filters} ${ui.filters} ${ui.productFilters} ${styles.filters}`}>
       <label className={s.field}>Buscar producto o SKU<input type="search" value={query} onChange={e => update(setQuery,e.target.value)} placeholder="Nombre o SKU" /></label>

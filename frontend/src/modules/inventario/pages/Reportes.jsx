@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { RefreshCw, Download, ChartNoAxesCombined, ArrowDownLeft, ArrowUpRight, Scale, PackageX, ArrowLeft, ArrowRight } from 'lucide-react';
+import InventoryLoading from '../components/InventoryLoading';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { loadReports } from '../api/inventoryApi';
 import { buildReports, searchReport, reportPage, reportsCsv, reportDay, periodBucket } from './reportsData';
@@ -37,6 +39,8 @@ export function FlowReportRow({ row }) {
 }
 
 export default function Reportes() {
+  const outlet = useOutletContext() || {};
+  const { status = 'ready' } = outlet;
   const today=reportDay(new Date().toISOString());
   const [from,setFrom]=useState(today.slice(0,8)+'01');
   const [to,setTo]=useState(today);
@@ -56,7 +60,7 @@ export default function Reportes() {
       .catch(e=>{if(!controller.signal.aborted){setError(e.message);setLoading(false);}});
     return ()=>controller.abort();
   },[attempt]);
-  function refresh(){setLoading(true);setData(null);setError('');setAttempt(n=>n+1);}
+  function refresh(){setLoading(true);setError('');setAttempt(n=>n+1);}
   let report=null, calculationError='';
   try { if(data) report=buildReports(data,{from,to,group,top}); } catch(e){calculationError=e.message;}
   const historyKnown=data && !data.readOnly;
@@ -84,10 +88,10 @@ export default function Reportes() {
   }
   function change(setter,value){setter(value);setPage(1);}
   function changeKind(value){setKind(value);setSort(value==='ranking'?'units':['flow','sessions','counts'].includes(value)?'date':'name');setPage(1);}
+  if (status === 'loading') return <InventoryLoading label="Cargando reportes…" />;
   return <div className={`${s.page} ${ui.workspace} ${styles.workspace}`} aria-busy={loading}>
-    <header className={`${s.header} ${ui.heading} ${styles.heading}`}><div><h1>Reportes e indicadores</h1></div><button className={ui.secondary} disabled={loading} onClick={refresh}><RefreshCw size={16} aria-hidden="true" />{loading?'Consultando…':'Actualizar'}</button></header>
-    {loading&&<p role="status" className={ui.notice}>Consultando el historial completo autorizado…</p>}
-    {(error||calculationError)&&<p role="alert" className={ui.alert}>{error||calculationError}</p>}
+    <header className={`${s.header} ${ui.heading} ${styles.heading}`}><div><h1>Reportes e indicadores</h1></div><button className={ui.secondary} aria-busy={Boolean(loading)} disabled={loading} onClick={refresh}>{loading ? <InventoryLoading compact label="Actualizando…" /> : <RefreshCw size={16} aria-hidden="true" />}{loading ? 'Actualizando…' : 'Actualizar'}</button></header>
+    {(error||calculationError)&&<p role="alert" className={ui.alert}>{data && error ? `No se pudo actualizar el reporte: ${error}` : (error||calculationError)}</p>}
     <section className={`${s.card} ${styles.period} ${ui.productFilters}`} aria-labelledby="report-period-title"><h2 id="report-period-title">Período de análisis</h2><div className={`${s.filters} ${styles.periodFields}`}><label className={s.field}>Desde<input type="date" value={from} onChange={e=>change(setFrom,e.target.value)} /></label><label className={s.field}>Hasta<input type="date" value={to} onChange={e=>change(setTo,e.target.value)} /></label><label className={s.field}>Agrupar por<select value={group} onChange={e=>change(setGroup,e.target.value)}><option value="day">Día</option><option value="week">Semana</option><option value="month">Mes</option></select></label></div></section>
     {report&&<>
       <section className={`${styles.cards} ${ui.summary}`} aria-label="Indicadores del periodo completo">

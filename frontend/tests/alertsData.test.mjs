@@ -52,10 +52,16 @@ test('alertas: interfaz accesible, consulta sin escrituras y diferencias sin con
   assert.ok(html.includes('Revisar reposición; mínimo en cero'));
   assert.ok(html.includes('Diferencias sin confirmar'));
   assert.ok(html.includes('role="status"'));
+  assert.ok(!html.includes('Consultando información actual de inventario'));
+  assert.ok(html.includes('Actualizando…'));
+  assert.ok(html.includes('aria-busy="true"'));
   assert.ok(!html.includes('Registrar movimiento'));
   assert.ok(!html.includes('ALMACÉN · SUPERVISIÓN DE INVENTARIO'));
   assert.ok(!html.includes('Situaciones que requieren atención'));
   assert.ok(!html.includes('Productos normales'));
+  const loadingHtml = render([product(1,0,0)], '/', { status: 'loading' });
+  assert.ok(loadingHtml.includes('Cargando alertas…'));
+  assert.ok(!loadingHtml.includes('<h1>Alertas y notificaciones</h1>'));
   const cards = html.match(/<section[^>]*aria-label="Resumen de alertas"[^>]*>(.*?)<\/section>/s)[1];
   assert.equal((cards.match(/<article/g) || []).length, 3);
   assert.ok(!/<a |<button|tabindex|role="button"/i.test(cards));

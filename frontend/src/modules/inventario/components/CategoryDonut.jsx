@@ -38,9 +38,9 @@ export default function CategoryDonut({ categories, total }) {
         </g>
       </svg>
       <div className={s.center}>
-        <span>{active?.name ?? 'Valor total'}</span>
-        <strong>{money(active?.value ?? total)}</strong>
-        <small>{active ? `${percentage(active.value / total * 100)}% del inventario` : `${categories.length} categorías`}</small>
+        <span>{active?.name ?? 'Categorías'}</span>
+        <strong>{active ? money(active.value) : categories.length}</strong>
+        <small>{active ? `${percentage(active.value / total * 100)}% del inventario` : 'en el inventario'}</small>
       </div>
     </div>
     <ul className={s.legend} aria-label="Valor del inventario por categoría">

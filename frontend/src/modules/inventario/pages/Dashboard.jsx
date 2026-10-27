@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowDownLeft,
@@ -7,12 +7,12 @@ import {
   Package,
   Wallet,
   AlertTriangle,
-  PackageX,
   Clock,
   CheckCircle2,
   BarChart3,
   ShoppingCart,
   TrendingUp,
+  Info,
 } from 'lucide-react';
 
 import TopProductsChart from '../components/TopProductsChart';
@@ -25,13 +25,6 @@ import {
   numeric,
 } from './dashboardData';
 import s from './Dashboard.module.css';
-
-const money = value =>
-  new Intl.NumberFormat('es-PE', {
-    style: 'currency',
-    currency: 'PEN',
-    maximumFractionDigits: 2,
-  }).format(value);
 
 const integer = value =>
   new Intl.NumberFormat('es-PE').format(value);
@@ -81,11 +74,7 @@ export default function Dashboard({
     <div className={s.page}>
       <header className={s.header}>
         <div>
-          <span className={s.eyebrow}>
-            EAGLE GAMING / INVENTARIO
-          </span>
           <h1>Panel de control</h1>
-          <p>Lo que necesitas saber para gestionar tu inventario</p>
         </div>
       </header>
 
@@ -110,77 +99,38 @@ export default function Dashboard({
         </div>
       )}
 
-      <div className={s.sectionLabel}>
-        <span>RESUMEN DEL INVENTARIO</span>
-        <span>Stock actual</span>
-      </div>
-
       <section className={s.kpis} aria-label="Indicadores actuales">
         <Stat
-          title="Valor del inventario"
-          value={money(summary.value)}
-          description={`${integer(products.length)} productos registrados`}
-          icon={Wallet}
+          title="Productos registrados"
+          value={integer(products.length)}
+          description=""
+          icon={Package}
           to="/dashboard/productos"
         />
 
         <Stat
           title="Unidades disponibles"
           value={integer(summary.units)}
-          description="Existencias totales en almacén"
+          description=""
           icon={Package}
           to="/dashboard/productos?estado=disponible"
         />
 
         <Stat
-          title="Stock bajo"
-          value={integer(summary.low)}
-          description="Con existencias, en el mínimo o por debajo"
+          title="Requieren atención"
+          value={integer(summary.empty + summary.low)}
+          description={<>{integer(summary.empty)} agotados · {integer(summary.low)} stock bajo</>}
           icon={AlertTriangle}
-          tone="warning"
-          to="/dashboard/productos?estado=bajo"
-        />
-
-        <Stat
-          title="Productos agotados"
-          value={integer(summary.empty)}
-          description="Sin unidades disponibles"
-          icon={PackageX}
           tone="danger"
-          to="/dashboard/productos?estado=sin-stock"
+          to="/dashboard/alertas"
         />
       </section>
-
-      {products.length > 0 && (
-        <div className={s.insights} aria-label="Avisos del inventario">
-          {summary.empty > 0 && (
-            <div className={s.dangerInsight}>
-              <span aria-hidden="true">⚠️</span>
-              <span>
-                {summary.empty} producto
-                {summary.empty === 1 ? '' : 's'} sin stock.
-                Reposición inmediata recomendada.
-              </span>
-            </div>
-          )}
-
-          {!salesEnabled && (
-            <div className={s.warningInsight}>
-              <span aria-hidden="true">⚠️</span>
-              <span>
-                El registro de ventas está pendiente de habilitación.
-              </span>
-            </div>
-          )}
-        </div>
-      )}
 
       <div className={s.mainGrid}>
         <section className={s.panel}>
           <PanelTitle
             icon={AlertTriangle}
             title="Productos que requieren atención"
-            subtitle="Agotados primero, seguidos de los productos con menor stock."
           />
 
           {summary.attention.length > 0 ? (
@@ -239,10 +189,9 @@ export default function Dashboard({
 
               <Link
                 className={s.footerLink}
-                to="/dashboard/productos?estado=alertas"
+                to="/dashboard/alertas"
               >
-                Ver productos que requieren atención (
-                {summary.attention.length})
+                Ver todas las alertas
                 <ArrowRight size={15} />
               </Link>
             </>
@@ -298,17 +247,6 @@ export default function Dashboard({
                         {dateTime(movement.date)}
                       </span>
 
-                      <small title={movement.user}>
-                        Responsable: {movement.user || 'No registrado'}
-                      </small>
-
-                      {movement.saleId && (
-                        <small>
-                          Venta: {money(movement.total)}
-                          {' · '}
-                          {money(movement.unitPrice)} por unidad
-                        </small>
-                      )}
                     </div>
 
                     <div className={s.quantity}>
@@ -324,9 +262,9 @@ export default function Dashboard({
 
               <Link
                 className={s.footerLink}
-                to="/dashboard/historial"
+                to="/dashboard/movimientos"
               >
-                Ver historial completo
+                Ver movimientos
                 <ArrowRight size={15} />
               </Link>
             </>
@@ -341,7 +279,7 @@ export default function Dashboard({
               text={
                 readOnly
                   ? 'El historial estará disponible cuando se habilite el registro de movimientos.'
-                  : 'Las operaciones registradas aparecerán aquí con su fecha y responsable.'
+                  : 'Las operaciones registradas aparecerán aquí.'
               }
             />
           )}
@@ -353,7 +291,7 @@ export default function Dashboard({
           <PanelTitle
             icon={BarChart3}
             title="Entradas y salidas"
-            subtitle={`Unidades por día · ${rangeLabel.toLowerCase()}`}
+            subtitle={`Unidades por día · ${rangeLabel}`}
           />
 
           <div className={s.flowTotals}>
@@ -381,10 +319,6 @@ export default function Dashboard({
             />
           )}
 
-          <p className={s.chartNote}>
-            Registro de movimientos que modifican las existencias
-            del inventario
-          </p>
         </section>
 
         <section className={s.panel}>
@@ -407,24 +341,15 @@ export default function Dashboard({
             />
           )}
 
-          <p className={s.chartNote}>
-            Stock × precio registrado de cada producto
-          </p>
         </section>
 
         <section className={s.panel}>
           <PanelTitle
             icon={TrendingUp}
-            title="Monto vendido por día"
+            title="Ventas por día"
             subtitle={rangeLabel}
+            info="Los cambios posteriores de precio no modifican estos importes."
           />
-
-          <div className={s.salesTotal}>
-            <span>Total vendido</span>
-            <strong>
-              {salesEnabled ? money(salesSummary.total) : '—'}
-            </strong>
-          </div>
 
           {salesEnabled && salesSummary.recent.length > 0 ? (
             <SalesChart summary={salesSummary} />
@@ -440,16 +365,13 @@ export default function Dashboard({
             />
           )}
 
-          <p className={s.chartNote}>
-            Los cambios posteriores de precio no modifican estos importes.
-          </p>
         </section>
 
         <section className={s.panel}>
           <PanelTitle
             icon={ShoppingCart}
             title="Productos más vendidos"
-            subtitle={`Cinco productos por unidades vendidas · ${rangeLabel.toLowerCase()}`}
+            subtitle={`Top 5 por unidades · ${rangeLabel}`}
           />
 
           {salesEnabled && salesSummary.top.length > 0 ? (
@@ -494,14 +416,35 @@ function Stat({
   );
 }
 
-function PanelTitle({ icon: Icon, title, subtitle }) {
+function PanelTitle({ icon: Icon, title, subtitle, info }) {
+  const infoId = useId();
+  const [infoOpen, setInfoOpen] = useState(false);
   return (
     <header className={s.panelTitle}>
       <div>
         <Icon size={17} />
         <h2>{title}</h2>
+        {info && (
+          <span
+            className={s.info}
+            onMouseEnter={() => setInfoOpen(true)}
+            onMouseLeave={event => {
+              if (!event.currentTarget.contains(document.activeElement)) setInfoOpen(false);
+            }}
+            onFocus={() => setInfoOpen(true)}
+            onBlur={() => setInfoOpen(false)}
+            onKeyDown={event => {
+              if (event.key === 'Escape') setInfoOpen(false);
+            }}
+          >
+            <button type="button" className={s.infoButton} aria-label="Información sobre los precios históricos" aria-describedby={infoId} onClick={() => setInfoOpen(true)}>
+              <Info size={15} aria-hidden="true" />
+            </button>
+            <span id={infoId} role="tooltip" className={s.infoTooltip} hidden={!infoOpen}>{info}</span>
+          </span>
+        )}
       </div>
-      <p>{subtitle}</p>
+      {subtitle && <p>{subtitle}</p>}
     </header>
   );
 }
