@@ -8,7 +8,7 @@ test('visión: tipos reales, tamaño y dimensiones de las imágenes',()=>{
   for(const [w,h] of [[31,100],[8193,32],[4001,4000]])assert.ok(visionDimensionsError(w,h));
 });
 
-test('IA: presentación accesible conserva estimaciones, selección y validaciones reales',async()=>{
+test('IA: presentación accesible usa predicción sin simulaciones y conserva reconocimiento visual',async()=>{
   const [{build},{default:react},{createElement:h},{renderToStaticMarkup},{fileURLToPath}]=await Promise.all([
     import('vite'),import('@vitejs/plugin-react'),import('react'),import('react-dom/server'),import('node:url')]);
   await build({configFile:false,root:fileURLToPath(new URL('../',import.meta.url)),plugins:[react()],logLevel:'error',
@@ -19,11 +19,10 @@ test('IA: presentación accesible conserva estimaciones, selección y validacion
   const original=structuredClone(products);
   const html=renderToStaticMarkup(h(Prediccion,{products}));
   assert.ok(html.includes('<h1>Predicción de demanda</h1>'));
-  assert.equal((html.match(/<article/g)||[]).length,4);
-  for(const days of [14,3,2,9])assert.ok(html.includes(`≈ ${days} días`));
-  for(const n of [2,4,6,8])assert.ok(html.includes(`Reponer ${n} unidades pronto.`));
-  assert.ok(!html.includes('Producto 5')&&!html.includes('Demostración')&&!html.includes('(IA)'));
-  assert.equal((html.match(/No utilizan un modelo entrenado ni analizan ventas históricas/g)||[]).length,1);
+  assert.equal((html.match(/<article/g)||[]).length,0);
+  assert.ok(html.includes('Predicciones no disponibles') && html.includes('El historial de ventas no está habilitado para esta sesión.'));
+  assert.ok(!html.includes('Reponer') && !html.includes('Agotamiento estimado'));
+  assert.ok(!html.includes('Demostración')&&!html.includes('(IA)'));
   assert.deepEqual(products,original);
   const vision=renderToStaticMarkup(h(Vision));
   assert.ok(vision.includes('<h1>Reconocimiento visual</h1>'));
