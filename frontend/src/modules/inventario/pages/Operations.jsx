@@ -32,15 +32,17 @@ export default function Operations({ kind }) {
   const lock = useRef(false);
   const abortRef = useRef(null);
   const docs = isPurchase ? data.purchases : data.sales;
-  const load = useCallback(async () => {
+  const load = useCallback(() => {
     abortRef.current?.abort();
     const controller = new AbortController(); abortRef.current = controller;
-    setLoading(true);
-    try { setData(await loadCommerce(controller.signal)); setError(''); }
-    catch (reason) { if (reason.name !== 'AbortError') setError(reason.message || 'No se pudieron cargar los documentos.'); }
-    finally { if (!controller.signal.aborted) setLoading(false); }
+    return loadCommerce(controller.signal).then(result => {
+      if (!controller.signal.aborted) { setData(result); setError(''); }
+    }).catch(reason => {
+      if (!controller.signal.aborted && reason.name !== 'AbortError') setError(reason.message || 'No se pudieron cargar los documentos.');
+    }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
   }, []);
   useEffect(() => { load(); return () => abortRef.current?.abort(); }, [load]);
+  const refresh = () => { setLoading(true); return load(); };
   const filtered = useMemo(() => docs.filter(doc => {
     const searchText = `${doc.code} ${isPurchase ? doc.supplier_name : doc.customer} ${doc.reference}`.toLocaleLowerCase('es');
     const date = String(isPurchase ? doc.purchase_date : doc.sale_date).slice(0, 10);
@@ -48,13 +50,12 @@ export default function Operations({ kind }) {
   }).sort((a, b) => sort === 'amount' ? Number(b.total) - Number(a.total) : new Date(b.created_at) - new Date(a.created_at)), [docs, isPurchase, query, status, from, to, sort]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / 10));
   const visible = filtered.slice((page - 1) * 10, page * 10);
-  useEffect(() => setPage(1), [query, status, from, to, sort]);
 
   const run = async body => {
     if (lock.current) return;
     lock.current = true; setBusy(true); setError('');
     try {
-      await saveCommerce(body); setPending(null); await load();
+      await saveCommerce(body); setPending(null); await refresh();
       if (body.action !== 'create' && body.kind !== 'supplier') retry?.();
       if (body.kind === 'supplier') notify?.('Proveedor guardado.');
       else notify?.(body.action === 'create' ? 'Documento creado como pendiente.' : body.action === 'receive' ? 'Compra recibida y stock actualizado.' : body.action === 'confirm' ? 'Venta confirmada y stock actualizado.' : 'Documento cancelado.');
@@ -97,14 +98,14 @@ export default function Operations({ kind }) {
     {readOnly && <p className={s.notice}><CircleAlert size={17} /> Tu cuenta tiene acceso de solo lectura. Puedes consultar operaciones, pero no crear ni procesar documentos.</p>}
     {error && <div className={s.error} role="alert"><span>{error}</span>{pending && <button type="button" className={s.secondary} disabled={busy} onClick={() => run(pending)}><RefreshCw size={15} /> Reintentar la misma solicitud</button>}</div>}
     <section className={s.filters} aria-label="Filtros de documentos">
-      <label className={s.search}><Search size={17} /><input aria-label="Buscar por código o proveedor" placeholder={`Buscar ${isPurchase ? 'código o proveedor' : 'código o cliente'}…`} value={query} onChange={e => setQuery(e.target.value)} /></label>
-      <label>Estado<select value={status} onChange={e => setStatus(e.target.value)}><option value="todos">Todos</option><option value="pendiente">Pendiente</option><option value={isPurchase ? 'recibida' : 'confirmada'}>{isPurchase ? 'Recibida' : 'Confirmada'}</option><option value="cancelada">Cancelada</option></select></label>
-      <label><CalendarDays size={15} /> Desde<input type="date" value={from} onChange={e => setFrom(e.target.value)} /></label>
-      <label><CalendarDays size={15} /> Hasta<input type="date" value={to} onChange={e => setTo(e.target.value)} /></label>
-      <label>Ordenar<select value={sort} onChange={e => setSort(e.target.value)}><option value="date">Más recientes</option><option value="amount">Mayor importe</option></select></label>
+      <label className={s.search}><Search size={17} /><input aria-label="Buscar por código o proveedor" placeholder={`Buscar ${isPurchase ? 'código o proveedor' : 'código o cliente'}…`} value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} /></label>
+      <label>Estado<select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}><option value="todos">Todos</option><option value="pendiente">Pendiente</option><option value={isPurchase ? 'recibida' : 'confirmada'}>{isPurchase ? 'Recibida' : 'Confirmada'}</option><option value="cancelada">Cancelada</option></select></label>
+      <label><CalendarDays size={15} /> Desde<input type="date" value={from} onChange={e => { setFrom(e.target.value); setPage(1); }} /></label>
+      <label><CalendarDays size={15} /> Hasta<input type="date" value={to} onChange={e => { setTo(e.target.value); setPage(1); }} /></label>
+      <label>Ordenar<select value={sort} onChange={e => { setSort(e.target.value); setPage(1); }}><option value="date">Más recientes</option><option value="amount">Mayor importe</option></select></label>
     </section>
     <section className={s.panel}>
-      <div className={s.panelHeading}><div><Icon size={19} /><div><h2>Registro de {title.toLocaleLowerCase('es')}</h2><p>{loading ? 'Actualizando…' : `${quantity(filtered.length)} documentos`}</p></div></div><button type="button" className={s.iconButton} onClick={load} disabled={loading} aria-label="Actualizar"><RefreshCw size={17} /></button></div>
+      <div className={s.panelHeading}><div><Icon size={19} /><div><h2>Registro de {title.toLocaleLowerCase('es')}</h2><p>{loading ? 'Actualizando…' : `${quantity(filtered.length)} documentos`}</p></div></div><button type="button" className={s.iconButton} onClick={refresh} disabled={loading} aria-label="Actualizar"><RefreshCw size={17} /></button></div>
       {loading ? <div className={s.loading} role="status">Cargando operaciones…</div> : filtered.length ? <>
         <div className={s.tableWrap}><table><thead><tr><th>Código</th><th>Fecha</th><th>{isPurchase ? 'Proveedor' : 'Cliente'}</th><th>Unidades</th><th>Total</th><th>Estado</th><th>Responsable</th><th /></tr></thead><tbody>
           {visible.map(doc => <tr key={doc.id}><td className={s.code}>{doc.code}</td><td>{displayDate(isPurchase ? doc.purchase_date : doc.sale_date)}</td><td>{isPurchase ? doc.supplier_name : doc.customer || 'Público general'}</td><td>{quantity(totalUnits(doc))}</td><td className={s.amount}>{currency(doc.total)}</td><td><span className={`${s.badge} ${s[doc.status]}`}>{doc.status}</span></td><td>{doc.actor_email || '—'}</td><td><button type="button" className={s.viewButton} onClick={() => setSelected(doc)}><Eye size={15} /> Detalle</button></td></tr>)}

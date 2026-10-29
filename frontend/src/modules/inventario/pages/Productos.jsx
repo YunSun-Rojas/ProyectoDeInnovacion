@@ -717,7 +717,6 @@ export default function Productos({
   onEdit,
   onDelete,
   onSale,
-  salesEnabled = false,
   readOnly = true,
   saving = false,
   writeError = "",
