@@ -15,6 +15,8 @@ import {
   X,
   Package,
   Boxes,
+  AlertTriangle,
+  CircleDollarSign,
   Download,
   ChevronLeft,
   ChevronRight,
@@ -70,15 +72,17 @@ function recentlyAdded(a, b) {
     || String(a.sku ?? '').localeCompare(String(b.sku ?? ''), 'es');
 }
 
-function summarize(products) {
+function summarize(products, fallback = 5) {
   return products.reduce(
     (result, product) => ({
       products: result.products + 1,
       units: result.units + numeric(product.stock),
       value:
         result.value + numeric(product.stock) * numeric(product.price),
+      low:
+        result.low + (numeric(product.stock) > 0 && numeric(product.stock) <= minimum(product, fallback) ? 1 : 0),
     }),
-    { products: 0, units: 0, value: 0 }
+    { products: 0, units: 0, value: 0, low: 0 }
   );
 }
 
@@ -225,33 +229,43 @@ const STYLES = `
 
 .inv-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .inv-stat {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 17px 18px;
+  min-height: 142px;
+  padding: 20px;
   background: var(--inv-card);
   border: 1px solid var(--inv-border);
   border-radius: 10px;
 }
 
-.inv-stat span {
+.inv-stat > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.inv-stat > div:first-child > span {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .35px;
+  text-transform: uppercase;
   color: var(--inv-muted);
 }
 
 .inv-stat strong {
   display: block;
-  margin: 7px 0 5px;
-  font-size: 25px;
-  letter-spacing: -.7px;
+  margin: 23px 0 4px;
+  font-size: 24px;
+  letter-spacing: -.5px;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .inv-stat small { font-size: 10px; color: var(--inv-muted); }
@@ -260,9 +274,9 @@ const STYLES = `
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
   background: var(--inventory-accent-tint, #fff0f1);
   color: #e32636;
 }
@@ -308,7 +322,7 @@ const STYLES = `
   outline: none;
   background: transparent;
   color: var(--inv-ink);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .inv-search:focus-within {
@@ -669,13 +683,20 @@ const STYLES = `
   .inv-page { padding: 20px; }
   .inv-select { flex: 1 1 150px; }
   .inv-search { flex-basis: 100%; }
-  .inv-stat strong { font-size: 22px; }
+  .inv-stat { min-height: 125px; padding: 14px; }
+  .inv-stat strong { margin-top: 20px; font-size: 20px; }
+  .inv-stat-icon { width: 32px; height: 32px; }
 }
 
 @media (max-width: 600px) {
   .inv-page { padding: 16px 12px; }
-  .inv-summary-grid { grid-template-columns: 1fr; }
-  .inv-stat { padding: 14px 16px; }
+  .inv-summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .inv-stat { min-height: 112px; gap: 4px; padding: 9px 7px; }
+  .inv-stat > div:first-child > span { font-size: 8px; letter-spacing: 0; }
+  .inv-stat strong { margin-top: 17px; font-size: 14px; letter-spacing: -.3px; }
+  .inv-stat small { font-size: 8px; }
+  .inv-stat-icon { width: 24px; height: 24px; border-radius: 7px; }
+  .inv-stat-icon svg { width: 14px; height: 14px; }
   .inv-header h1 { font-size: 24px; }
   .inv-actions { width: 100%; }
   .inv-actions > button { flex: 1; }
@@ -758,7 +779,7 @@ export default function Productos({
     );
   }, [categories, products]);
 
-  const summary = useMemo(() => summarize(products), [products]);
+  const summary = useMemo(() => summarize(products, defaultMinStock), [products, defaultMinStock]);
 
   const filtered = useMemo(() => {
     const text = query.trim().toLocaleLowerCase("es");
@@ -1000,6 +1021,18 @@ export default function Productos({
       detail: "Suma del stock registrado",
       icon: Boxes,
     },
+    {
+      title: "Stock bajo",
+      value: integer(summary.low),
+      detail: "Productos bajo su mínimo",
+      icon: AlertTriangle,
+    },
+    {
+      title: "Valorizado",
+      value: money(summary.value),
+      detail: "Stock × precio unitario",
+      icon: CircleDollarSign,
+    },
   ];
 
   return (
@@ -1011,7 +1044,6 @@ export default function Productos({
         </div>
 
         <div className="inv-actions">
-          <button type="button" className="inv-button" disabled={!salesEnabled || readOnly || busy || uncertain || !products.some(p => p.stock > 0)} title={salesEnabled ? "Registrar una salida por venta" : "El registro de ventas está pendiente de habilitación"} onClick={() => setSaleOpen(true)}>Registrar venta</button>
           <button
             type="button"
             className="inv-button"

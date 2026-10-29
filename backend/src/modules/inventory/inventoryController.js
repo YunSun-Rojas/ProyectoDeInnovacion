@@ -1,4 +1,5 @@
 import { readBody, fail } from '../../utils/http.js';
+import { loadCommerce, saveCommerce } from './commerceService.js';
 
 export function createInventoryController(inventory) {
   return {
@@ -34,6 +35,16 @@ export function createInventoryController(inventory) {
     },
     async load({ session: { client, user }, send }) {
       send(200, await inventory.loadInventory(client, user.id));
+    },
+    async commerceLoad({ session: { client, user }, send }) {
+      send(200, await loadCommerce(client, user.id));
+    },
+    async commerceSave({ req, session: { client }, send }) {
+      const body = await readBody(req);
+      if (!body || typeof body !== 'object' || Array.isArray(body) ||
+        typeof body.kind !== 'string' || typeof body.action !== 'string' || typeof body.id !== 'string' ||
+        (body.data != null && (typeof body.data !== 'object' || Array.isArray(body.data)))) throw fail(400, 'Solicitud comercial inválida.');
+      send(200, await saveCommerce(client, body));
     },
     async change({ req, session: { client, user }, send }) {
       const body = await readBody(req);

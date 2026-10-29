@@ -1,15 +1,19 @@
 import { useState, useEffect, useRef } from "react";
 import { DATE_RANGES, limaDate, movementFlow } from '../pages/dashboardData';
 import { useAuthSession } from '../../auth/hooks/useAuthSession';
+import { useNavigate } from "react-router-dom";
 import {
   Calendar,
   Download,
   Bell,
+  Moon,
+  Sun,
   CheckCircle2,
   AlertTriangle,
   XCircle,
   ChevronDown,
   RefreshCw,
+  X,
 } from "lucide-react";
 
 const C = {
@@ -45,7 +49,8 @@ function useClickOutside(ref, handler) {
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export default function Header({ products = [], inventoryReady = true, selectedRange = 'month', onRangeChange, activity = { recent: [] }, historyAvailable = false, salesSummary = { total: 0, units: 0 }, salesEnabled = false }) {
+export default function Header({ products = [], inventoryReady = true, selectedRange = '30', onRangeChange, customRange, onCustomRangeChange, activity = { recent: [] }, historyAvailable = false, salesSummary = { total: 0, units: 0 }, salesEnabled = false, darkMode = false, toggleDarkMode }) {
+  const navigate = useNavigate();
   const { session } = useAuthSession();
   const profileName = session?.user?.user_metadata?.full_name;
   const displayName = (typeof profileName === 'string' && profileName.trim()) || session?.user?.email || 'Mi cuenta';
@@ -55,12 +60,15 @@ export default function Header({ products = [], inventoryReady = true, selectedR
   const [exporting,         setExporting]         = useState(false);
   const [justExported,      setJustExported]      = useState(false);
 
-  const notifRef   = useRef(null);
+  const notifDialogRef = useRef(null);
   const dateRef    = useRef(null);
-  const selectedRangeConfig = DATE_RANGES.find(({ id }) => id === selectedRange) ?? DATE_RANGES.find(range => range.id === 'month');
+  const selectedRangeConfig = DATE_RANGES.find(({ id }) => id === selectedRange) ?? DATE_RANGES.find(range => range.id === '30');
 
-  useClickOutside(notifRef, () => setShowNotifications(false));
   useClickOutside(dateRef,  () => setShowDatePicker(false));
+  useEffect(() => {
+    const dialog = notifDialogRef.current;
+    if (showNotifications && dialog && !dialog.open) dialog.showModal();
+  }, [showNotifications]);
 
   // Clasificar alertas por nivel
   const critical = products.filter(p => p.stock === 0);
@@ -182,7 +190,8 @@ export default function Header({ products = [], inventoryReady = true, selectedR
               {DATE_RANGES.map(r => (
                 <button
                   key={r.label}
-                  onClick={() => { onRangeChange?.(r.id); setShowDatePicker(false); }}
+                  type="button"
+                  onClick={() => { onRangeChange?.(r.id); if (r.id !== 'custom') setShowDatePicker(false); }}
                   style={{
                     display: "block", width: "100%", textAlign: "left",
                     padding: "8px 12px", borderRadius: 7, border: "none",
@@ -195,6 +204,33 @@ export default function Header({ products = [], inventoryReady = true, selectedR
                   {r.label}
                 </button>
               ))}
+              {selectedRange === 'custom' && (
+                <div style={{ display: "grid", gap: 8, padding: "8px 12px 10px" }}>
+                  <label style={{ display: "grid", gap: 4, color: C.muted, fontFamily: FONT.body, fontSize: 11 }}>
+                    Desde
+                    <input
+                      type="date"
+                      aria-label="Fecha inicial del rango"
+                      max={customRange?.to || limaDate(new Date())}
+                      value={customRange?.from || ''}
+                      onChange={event => onCustomRangeChange?.({ ...customRange, from: event.target.value })}
+                      style={{ width: "100%", boxSizing: "border-box", padding: "7px 8px", border: `1px solid ${C.border}`, borderRadius: 6, background: C.surface, color: C.ink, font: `12px ${FONT.body}` }}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4, color: C.muted, fontFamily: FONT.body, fontSize: 11 }}>
+                    Hasta
+                    <input
+                      type="date"
+                      aria-label="Fecha final del rango"
+                      min={customRange?.from}
+                      max={limaDate(new Date())}
+                      value={customRange?.to || ''}
+                      onChange={event => onCustomRangeChange?.({ ...customRange, to: event.target.value })}
+                      style={{ width: "100%", boxSizing: "border-box", padding: "7px 8px", border: `1px solid ${C.border}`, borderRadius: 6, background: C.surface, color: C.ink, font: `12px ${FONT.body}` }}
+                    />
+                  </label>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -226,10 +262,30 @@ export default function Header({ products = [], inventoryReady = true, selectedR
       {/* ── Lado derecho: notificaciones + usuario ── */}
       <div className="header-user" style={{ display: "flex", alignItems: "center", gap: 14 }}>
 
+        <button
+          type="button"
+          onClick={toggleDarkMode}
+          aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+          aria-pressed={darkMode}
+          title={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+          style={{
+            display: "grid", placeItems: "center", border: "none",
+            background: darkMode ? C.accentTint : "transparent",
+            cursor: "pointer", padding: 8, borderRadius: 8,
+            color: C.inkSecond, transition: "background 0.2s",
+          }}
+        >
+          {darkMode ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
+        </button>
+
         {/* Campana de notificaciones */}
-        <div ref={notifRef} style={{ position: "relative" }}>
+        <div>
           <button
-            onClick={() => setShowNotifications(!showNotifications)}
+            type="button"
+            onClick={() => setShowNotifications(true)}
+            aria-label={`Notificaciones${alerts.length > 0 ? `, ${alerts.length} activas` : ''}`}
+            aria-haspopup="dialog"
+            aria-expanded={showNotifications}
             style={{
               position: "relative", border: "none",
               background: showNotifications ? C.accentTint : "transparent",
@@ -241,43 +297,50 @@ export default function Header({ products = [], inventoryReady = true, selectedR
             {alerts.length > 0 && (
               <span style={{
                 position: "absolute", top: 4, right: 4,
-                minWidth: 16, height: 16, borderRadius: 8,
-                background: C.accent, color: "#fff",
-                fontSize: 9, fontWeight: 700, lineHeight: "16px",
-                textAlign: "center", padding: "0 3px",
-                fontFamily: FONT.body,
-              }}>
-                {alerts.length}
-              </span>
+                width: 7, height: 7, borderRadius: "50%",
+                background: C.accent,
+              }} aria-hidden="true" />
             )}
           </button>
 
-          {/* Panel de notificaciones */}
-          {showNotifications && (
-            <div style={{
-              position: "absolute", right: 0, top: 42,
-              width: "min(340px, calc(100vw - 32px))", background: C.surface,
-              border: `1px solid ${C.border}`, borderRadius: 12,
-              boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
-              overflow: "hidden", zIndex: 200,
-            }}>
+          <dialog
+            ref={notifDialogRef}
+            className="notification-dialog"
+            aria-labelledby="notification-dialog-title"
+            onClose={() => setShowNotifications(false)}
+            onClick={event => {
+              if (event.target === event.currentTarget) event.currentTarget.close();
+            }}
+          >
+            <div style={{ background: C.surface, color: C.ink }}>
               {/* Header del panel */}
               <div style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
                 padding: "14px 16px 10px",
                 borderBottom: `1px solid ${C.borderFaint}`,
               }}>
-                <span style={{ fontFamily: FONT.body, fontSize: 13, fontWeight: 700, color: C.ink }}>
-                  Notificaciones del Sistema
-                </span>
-                <span style={{
-                  background: alerts.length > 0 ? C.accentTint : C.successTint,
-                  color: alerts.length > 0 ? C.accent : C.success,
-                  fontSize: 10, fontWeight: 700, borderRadius: 10,
-                  padding: "2px 7px",
-                }}>
-                  {!inventoryReady ? 'Sin datos' : alerts.length > 0 ? `${alerts.length} activas` : "Sin alertas"}
-                </span>
+                <div>
+                  <h2 id="notification-dialog-title" style={{ fontFamily: FONT.body, fontSize: 16, fontWeight: 700, color: C.ink, margin: 0 }}>
+                    Notificaciones
+                  </h2>
+                  <span style={{
+                    display: "inline-block", marginTop: 6,
+                    background: alerts.length > 0 ? C.accentTint : C.successTint,
+                    color: alerts.length > 0 ? C.accent : C.success,
+                    fontSize: 10, fontWeight: 700, borderRadius: 10,
+                    padding: "2px 7px",
+                  }}>
+                    {!inventoryReady ? 'Sin datos' : alerts.length > 0 ? `${alerts.length} activas` : "Sin alertas"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Cerrar notificaciones"
+                  onClick={() => notifDialogRef.current?.close()}
+                  style={{ display: "grid", placeItems: "center", border: "none", background: "transparent", color: C.muted, cursor: "pointer", padding: 6, borderRadius: 6 }}
+                >
+                  <X size={18} aria-hidden="true" />
+                </button>
               </div>
 
               {/* Cuerpo */}
@@ -317,17 +380,25 @@ export default function Header({ products = [], inventoryReady = true, selectedR
                 )}
               </div>
 
-              {/* Footer */}
-              {alerts.length > 0 && (
-                <div style={{ borderTop: `1px solid ${C.borderFaint}`, padding: "10px 16px" }}>
-                  <p style={{ margin: 0, fontSize: 11, color: C.muted, textAlign: "center" }}>
-                    {critical.length > 0 && `${critical.length} producto${critical.length > 1 ? "s" : ""} agotado${critical.length > 1 ? "s" : ""}. `}
-                    {low.length > 0 && `${low.length} en stock bajo.`}
-                  </p>
-                </div>
-              )}
+              <div style={{ borderTop: `1px solid ${C.borderFaint}`, padding: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    notifDialogRef.current?.close();
+                    navigate("/dashboard/alertas");
+                  }}
+                  style={{
+                    display: "flex", justifyContent: "center", alignItems: "center",
+                    width: "100%", padding: "10px 14px", border: "none",
+                    borderRadius: 8, background: C.accent, color: "#fff",
+                    fontFamily: FONT.body, fontSize: 13, fontWeight: 650, cursor: "pointer",
+                  }}
+                >
+                  Ver todas las notificaciones
+                </button>
+              </div>
             </div>
-          )}
+          </dialog>
         </div>
 
         {/* Divider */}

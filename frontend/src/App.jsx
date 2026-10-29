@@ -12,6 +12,7 @@ import Historial from "./modules/inventario/pages/Historial";
 import Existencias from "./modules/inventario/pages/Existencias";
 import Kardex from "./modules/inventario/pages/Kardex";
 import Config from "./modules/inventario/pages/Config";
+import Operations from "./modules/inventario/pages/Operations";
 import { useAuthSession } from "./modules/auth/hooks/useAuthSession";
 
 function RequireSession({ session }) {
@@ -47,6 +48,8 @@ export default function App() {
       <Route path="/dashboard" element={<RequireSession session={session} />}>
         <Route index element={<DashboardRoute />} />
         <Route path="productos" element={<ProductosRoute currentUser={session?.user} />} />
+        <Route path="compras" element={<Operations kind="purchase" />} />
+        <Route path="ventas" element={<Operations kind="sale" />} />
         <Route path="prediccion" element={<PrediccionRoute />} />
         <Route path="vision" element={<Vision />} />
         <Route path="existencias" element={<Existencias />} />

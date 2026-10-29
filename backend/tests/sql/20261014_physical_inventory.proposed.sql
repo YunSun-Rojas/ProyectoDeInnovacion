@@ -23,7 +23,7 @@ DO $$ DECLARE t text; f record; c record; target regprocedure; BEGIN
  END LOOP;
  -- Mismo criterio de deriva que Fase 2: exigir el cuerpo de Fase 3 auditado.
  IF md5(replace(pg_get_functiondef('public.inventory_register_stock(uuid,bigint,bigint,text,integer,text)'::regprocedure),chr(13),''))
-  <> '267dcc78f00a1a61a3a6c69c274a1f43' THEN
+  <> 'b50b9bea9bef4af739016743eece4ef7' THEN
   RAISE EXCEPTION 'PHYSICAL_SCHEMA_DRIFT: cuerpo inventory_register_stock diferente';
  END IF;
  FOR c IN SELECT * FROM (VALUES

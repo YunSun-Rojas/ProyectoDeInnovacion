@@ -5,13 +5,13 @@ import ui from '../pages/InventoryUI.module.css';
 import styles from '../pages/Existencias.module.css';
 import { X } from 'lucide-react';
 
-export default function StockDialog({ products, initialProductId = '', saving, uncertain, error, onSave, onRetry, onClose, onSuccess, notify }) {
+export default function StockDialog({ products, initialProductId = '', initialAction = 'stock_in', saving, uncertain, error, onSave, onRetry, onClose, onSuccess, notify }) {
   const dialog = useRef(null);
   const dismiss = useRef(null);
   const locked = useRef(false);
   const [submittedProduct, setSubmittedProduct] = useState(null);
   const [productId, setProductId] = useState(() => products.some(product => String(product.id) === String(initialProductId)) ? String(initialProductId) : '');
-  const [action, setAction] = useState('stock_in');
+  const [action, setAction] = useState(() => ['stock_in', 'stock_out'].includes(initialAction) ? initialAction : 'stock_in');
   const [quantity, setQuantity] = useState('1');
   const [reason, setReason] = useState('');
   const [validation, setValidation] = useState('');

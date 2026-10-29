@@ -1,5 +1,5 @@
 /* Presentación acotada a Productos, Existencias, Movimientos, Kardex y sus diálogos. */
-.productsPage :global(.inv-summary-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.productsPage :global(.inv-summary-grid) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .workspace.productsPage :global(.inv-header) { margin-bottom: 18px; }
 .productsPage :global(.inv-summary) { margin-bottom: 18px; }
 .productsPage :global(.inv-pagination button) { gap: 6px; min-height: 38px; color: var(--ui-ink); }
@@ -20,7 +20,7 @@
   .productFilters option:is(:hover, :focus) { background: var(--ui-soft); outline: none; }
   .productFilters option::checkmark { color: #e32636; order: 1; margin-left: auto; }
 }
-@media (max-width: 560px) { .productsPage :global(.inv-summary-grid) { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .productsPage :global(.inv-summary-grid) { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; } }
 @media (prefers-reduced-motion: reduce) { .productFilters select::picker(select), .productFilters select::picker-icon { transition: none; } }
 /* Cada filtro del catálogo conserva su propio anclaje al redimensionar o desplazar. */
 @supports (appearance: base-select) and (anchor-scope: --catalog-filter) {
@@ -163,6 +163,11 @@
 .workspace :global(.inv-stat span) { font-weight: 600; }
 .workspace :global(.inv-stat small), .workspace :global(.inv-value-note) { font-size: 11px; line-height: 1.6; }
 .workspace :global(.inv-stat-icon) { width: 42px; height: 42px; border-radius: 12px; color: var(--inventory-danger, #d72c3c); }
+.workspace.productsPage :global(.inv-summary-grid) { gap: 10px; }
+.workspace.productsPage :global(.inv-stat) { min-height: 142px; padding: 18px; }
+.workspace.productsPage :global(.inv-stat strong) { margin-top: 23px; font-size: 24px; letter-spacing: -.5px; }
+.workspace.productsPage :global(.inv-stat-icon) { width: 36px; height: 36px; border-radius: 9px; }
+.workspace.productsPage :global(.inv-stat small) { font-size: 10px; line-height: normal; }
 .workspace :global(.inv-section-heading) { margin-bottom: 14px; }
 .workspace :global(.inv-panel) { border-radius: 16px; box-shadow: 0 3px 14px rgb(15 23 42 / 3%); }
 .workspace :global(.inv-toolbar) { padding: 20px; gap: 14px; background: var(--ui-surface); }

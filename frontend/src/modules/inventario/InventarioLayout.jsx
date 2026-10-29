@@ -39,7 +39,7 @@ export default function InventarioLayout({ userId }) {
   const { pathname } = useLocation();
 
   const activePage = pathname.split("/")[2] || "dashboard";
-  const inventoryFeedback = ['productos', 'existencias', 'movimientos', 'kardex', 'inventario-fisico', 'alertas', 'reportes'].includes(activePage);
+  const inventoryFeedback = ['productos', 'existencias', 'movimientos', 'kardex', 'inventario-fisico', 'alertas', 'reportes', 'compras', 'ventas'].includes(activePage);
   const contentRef = useRef(null);
   const entranceRef = useRef(null);
   useLayoutEffect(() => {
@@ -70,11 +70,21 @@ export default function InventarioLayout({ userId }) {
     retry,
   } = inventory;
 
-  const [selectedRange, setSelectedRange] = useState('month');
+  const [selectedRange, setSelectedRange] = useState('30');
   const today = limaDate(new Date());
-  const rangeConfig = DATE_RANGES.find(range => range.id === selectedRange) || DATE_RANGES.find(range => range.id === 'month');
-  const activity = useMemo(() => summarizeMovements(inventory.movements, periodRange(selectedRange, today)), [inventory.movements, selectedRange, today]);
-  const salesSummary = useMemo(() => summarizeSales(inventory.sales, periodRange(selectedRange, today)), [inventory.sales, selectedRange, today]);
+  const [customRange, setCustomRange] = useState(() => periodRange('30', limaDate(new Date())));
+  const rangeConfig = DATE_RANGES.find(range => range.id === selectedRange) || DATE_RANGES.find(range => range.id === '30');
+  const range = useMemo(() => periodRange(selectedRange, today, customRange), [selectedRange, today, customRange]);
+  const formatRangeDate = value => new Date(`${value}T12:00:00Z`).toLocaleDateString('es-PE', {
+    timeZone: 'America/Lima',
+    day: '2-digit',
+    month: 'short',
+  });
+  const rangeLabel = selectedRange === 'custom' && !range.error
+    ? `${formatRangeDate(range.from)} – ${formatRangeDate(range.to)}`
+    : rangeConfig.label;
+  const activity = useMemo(() => summarizeMovements(inventory.movements, range), [inventory.movements, range]);
+  const salesSummary = useMemo(() => summarizeSales(inventory.sales, range), [inventory.sales, range]);
 
   const { toast, notify, dismissToast } = useInventoryNotifications();
 
@@ -168,10 +178,14 @@ export default function InventarioLayout({ userId }) {
           inventoryReady={status === "ready"}
           selectedRange={selectedRange}
           onRangeChange={setSelectedRange}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
           activity={activity}
           salesSummary={salesSummary}
           salesEnabled={inventory.salesEnabled}
           historyAvailable={!inventory.readOnly}
+          darkMode={darkMode}
+          toggleDarkMode={toggleDarkMode}
         />
 
         <main
@@ -190,7 +204,8 @@ export default function InventarioLayout({ userId }) {
                 ...inventory,
                 activity,
                 salesSummary,
-                rangeLabel: rangeConfig.label,
+                rangeLabel,
+                rangeError: range.error || '',
                 products,
                 categories,
                 settings,

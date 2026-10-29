@@ -17,6 +17,26 @@ body {
 .inventory-sidebar svg { flex-shrink: 0; }
 .inventory-header, .sidebar-footer { flex-shrink: 0; }
 .sidebar-footer { position: relative; }
+.notification-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(680px, calc(100dvh - 40px));
+  padding: 0;
+  border: 1px solid var(--inventory-border, #e5e7eb);
+  border-radius: 16px;
+  background: var(--inventory-surface, #fff);
+  color: var(--inventory-ink, #1f2937);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 28%);
+  overflow: hidden;
+}
+.notification-dialog::backdrop {
+  background: rgb(15 23 42 / 48%);
+  backdrop-filter: blur(2px);
+}
 .dashboard-heading { flex-wrap: wrap; gap: 16px; }
 .dashboard-page > div > [role="link"] { min-width: 0; }
 

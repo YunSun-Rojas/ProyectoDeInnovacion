@@ -33,10 +33,9 @@ export async function loadInventory(client, userId, signal) {
     name: category.name,
   }));
 
-  const sales = salesRows.map(mapSale);
-  const saleByMovement = new Map(
-    sales.map(sale => [sale.movementId, sale])
-  );
+  const saleRecords = salesRows.map(mapSale);
+  const sales = saleRecords.filter(sale => !sale.cancelledAt);
+  const saleByMovement = new Map(saleRecords.map(sale => [sale.movementId, sale]));
 
   return {
     products: productRows.map(product => mapProduct(product, categories)),
@@ -167,6 +166,7 @@ export function mapSale(row) {
     movementId: String(row.movement_id),
     date: row.created_at,
     user: row.actor_email,
+    cancelledAt: row.cancelled_at ?? null,
   };
 }
 

@@ -17,11 +17,17 @@ import {
   Bell,
   ChartNoAxesCombined,
   ClipboardList,
+  ShoppingCart,
+  Truck,
 } from "lucide-react";
 
 const NAV_GROUPS = [
   { label: 'PRINCIPAL', items: [{ id: 'dashboard', label: 'Panel de control', icon: LayoutGrid }] },
-  { label: 'CATÁLOGO', items: [{ id: 'productos', label: 'Productos', icon: Boxes }] },
+  { label: 'COMERCIAL', items: [
+    { id: 'compras', label: 'Compras', icon: Truck },
+    { id: 'ventas', label: 'Ventas', icon: ShoppingCart },
+  ] },
+  { label: 'CATÁLOGO', items: [{ id: 'productos', label: 'Stock de Productos', icon: Boxes }] },
   { label: 'INVENTARIO Y OPERACIONES', items: [
     { id: 'existencias', label: 'Existencias', icon: Package },
     { id: 'movimientos', label: 'Movimientos', icon: History },

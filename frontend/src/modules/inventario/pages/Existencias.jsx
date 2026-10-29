@@ -66,8 +66,15 @@ export default function Existencias() {
   const { products = [], movements = [], defaultMinStock = 5, status, error, retry,
     stockEnabled, readOnly, saving, refreshing, uncertain, writeError, onStock, retryWrite, notify, getConfirmedChange } = useOutletContext();
   const [params, setParams] = useSearchParams();
+  const requestedAction = params.get('accion') === 'entrada'
+    ? 'stock_in'
+    : params.get('accion') === 'salida'
+      ? 'stock_out'
+      : '';
   const entryProduct = params.get('accion') === 'entrada' ? products.find(product => String(product.id) === params.get('producto')) : null;
-  const [stockOpen, setStockOpen] = useState(() => Boolean(entryProduct && stockEnabled && !readOnly && !saving && !uncertain));
+  const [stockOpen, setStockOpen] = useState(() => Boolean(
+    (entryProduct || requestedAction) && stockEnabled && !readOnly && !saving && !uncertain && products.length
+  ));
   const [confirmedMovement, setConfirmedMovement] = useState(null);
   const [highlightedId, setHighlightedId] = useState(null);
   const [history, setHistory] = useState(null);
@@ -115,7 +122,7 @@ export default function Existencias() {
       </li>)}</ul> : <div className={kardexStyles.empty}><BookOpen size={30} aria-hidden="true" /><h3>Sin movimientos registrados hoy</h3><p className={s.muted}>Registra una entrada, salida o ajuste para ver actividad aquí.</p></div>}
     </section>
     {history && <StockHistoryDialog product={history.product} movements={movements} initialMovement={history.movement} onClose={() => setHistory(null)} />}
-    {stockOpen && <StockDialog products={products} initialProductId={entryProduct?.id} saving={saving} uncertain={uncertain} error={writeError} onSave={(product, action, data) => { previousRequest.current = getConfirmedChange?.()?.requestId; return onStock(product, action, data); }} onRetry={retryWrite} notify={notify} onClose={closeStock} onSuccess={intent => {
+    {stockOpen && <StockDialog products={products} initialProductId={entryProduct?.id} initialAction={requestedAction} saving={saving} uncertain={uncertain} error={writeError} onSave={(product, action, data) => { previousRequest.current = getConfirmedChange?.()?.requestId; return onStock(product, action, data); }} onRetry={retryWrite} notify={notify} onClose={closeStock} onSuccess={intent => {
       const confirmed = confirmedStockChange(getConfirmedChange?.(), intent, previousRequest.current);
       if (confirmed) { setConfirmedMovement(confirmed.movement); setHighlightedId(confirmed.movement.id); }
       notify?.('Movimiento registrado con éxito');

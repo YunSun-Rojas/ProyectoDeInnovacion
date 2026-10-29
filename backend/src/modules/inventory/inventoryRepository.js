@@ -86,7 +86,7 @@ async function readRows(client, table, columns, signal) {
       .range(rows.length, rows.length + PAGE_SIZE - 1)
       .abortSignal(signal);
 
-    checkResponse(response);
+    try { checkResponse(response); } catch (error) { error.code = response.error?.code; throw error; }
 
     if (
       !Array.isArray(response.data) ||
@@ -109,6 +109,15 @@ async function readRows(client, table, columns, signal) {
   } while (rows.length < total);
 
   return rows;
+}
+
+async function readSales(client, signal) {
+  try {
+    return await readRows(client, 'inventory_sales', 'id,product_id,product_name,sku,quantity,unit_price,total,movement_id,actor_email,created_at,cancelled_at', signal);
+  } catch (error) {
+    if (!['42703', 'PGRST204'].includes(error.code)) throw error;
+    return readRows(client, 'inventory_sales', 'id,product_id,product_name,sku,quantity,unit_price,total,movement_id,actor_email,created_at', signal);
+  }
 }
 
 export async function readInventory(client, userId, signal) {
@@ -187,12 +196,7 @@ export async function readInventory(client, userId, signal) {
           ),
 
       salesEnabled
-        ? readRows(
-            client,
-            'inventory_sales',
-            'id,product_id,product_name,sku,quantity,unit_price,total,movement_id,actor_email,created_at',
-            signal
-          )
+        ? readSales(client, signal)
         : [],
     ]);
 

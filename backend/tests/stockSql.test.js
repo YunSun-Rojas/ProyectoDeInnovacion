@@ -34,6 +34,19 @@ test('Fase 3: transacciones de stock compatibles con RPC reales de Fases 1/2', a
   await db.exec('set role authenticated');
   assert.equal((await db.query('select inventory_stock_enabled() enabled')).rows[0].enabled, true);
 
+  await t.test('RPC de stock respeta el permiso de escritura aunque el usuario sea miembro', async () => {
+    await db.exec('reset role');
+    await db.exec(`create or replace function public.inventory_write_enabled() returns boolean
+      language sql stable set search_path = '' as $$ select false $$`);
+    await db.exec('set role authenticated');
+    await assert.rejects(stock(product, 'stock_in', 1), /INVENTORY_FORBIDDEN/);
+    await db.exec('reset role');
+    await db.exec(`create or replace function public.inventory_write_enabled() returns boolean
+      language sql stable set search_path = '' as $$ select exists
+      (select 1 from public.inventory_members where user_id=auth.uid()) $$`);
+    await db.exec('set role authenticated');
+  });
+
   await t.test('entrada múltiple, reintento y conflicto conservan atributos', async () => {
     const request = uuid();
     const result = await stock(product, 'stock_in', 6, 'Compra', request);

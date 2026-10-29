@@ -202,13 +202,19 @@ test('ventas valida importes y conserva el precio histórico separado del produc
     assert.throws(() => salePayload(data), /cantidad entera/);
   }
   const raw = { id: 'sale-1', product_id: 1, product_name: 'Mouse', sku: 'M-1', quantity: 2, unit_price: '80.00', total: '160.00', movement_id: '7', created_at: '2026-10-13T15:00:00Z', actor_email: 'admin@example.test' };
-  const { client } = server({ enabled: true, salesEnabled: true, rows: [{ ...products[0], price: '90.00', version: 4 }], sales: [raw], movements: [{ id: 7, type: 'Ajuste', quantity: -2, stock_before: 5, stock_after: 3, created_at: raw.created_at }] });
+  const canceled = { ...raw, id: 'sale-2', movement_id: '8', cancelled_at: '2026-10-14T15:00:00Z' };
+  const { client } = server({ enabled: true, salesEnabled: true, rows: [{ ...products[0], price: '90.00', version: 4 }], sales: [raw, canceled], movements: [
+    { id: 7, type: 'Ajuste', quantity: -2, stock_before: 5, stock_after: 3, created_at: raw.created_at },
+    { id: 8, type: 'Entrada', quantity: 2, stock_before: 3, stock_after: 5, created_at: canceled.created_at },
+  ] });
   const result = await loadInventory(client, userId);
   assert.equal(result.products[0].price, 90);
   assert.equal(result.sales[0].total, 160);
   assert.equal(result.sales[0].unitPrice, 80);
+  assert.equal(result.sales.length, 1, 'ventas revertidas no alimentan totales ni pronósticos');
   assert.equal(result.movements[0].type, 'Venta');
   assert.equal(result.movements[0].total, 160);
+  assert.equal(result.movements[1].type, 'Venta', 'el movimiento original conserva su tipo en el historial');
   assert.equal(result.salesEnabled, true);
   assert.equal(mapMovement({ id: 1, type: 'Salida' }).type, 'Salida');
   assert.throws(() => mapSale({ ...raw, total: '999' }), /incompleto/);
