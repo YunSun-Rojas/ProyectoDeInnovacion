@@ -9,11 +9,15 @@ export const methodLabels = {
 
 // Explicit seam for a future authorized evidence source. No manufactured
 // classification, coverage or model policy. readOnly does NOT deny sales reads.
-export function preparePredictionView({ products, sales, salesEnabled, historyAccess, status = 'ready', asOf, evidence } = {}) {
+export function preparePredictionView({ products, sales, salesEnabled, historyAccess, status = 'ready', asOf, evidence, evidenceState } = {}) {
   if (status === 'loading') return { state: 'loading' };
   if (historyAccess === 'denied') return { state: 'access_denied' };
   if (status !== 'ready') return { state: 'processing_error' };
   if (salesEnabled !== true) return { state: 'sales_disabled' };
+  if (evidenceState && evidenceState !== 'available') {
+    return { state: ['loading', 'migration_missing', 'access_denied', 'connection_error', 'invalid_evidence', 'evidence_error'].includes(evidenceState)
+      ? evidenceState : 'processing_error' };
+  }
   if (!Array.isArray(products) || !Array.isArray(sales)) return { state: 'processing_error' };
   // An explicitly malformed response is not proof that no stockouts occurred.
   // Missing evidence stays unverified; optional lists retain the Phase-2 contract.

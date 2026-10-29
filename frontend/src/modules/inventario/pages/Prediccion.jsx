@@ -19,6 +19,10 @@ const descriptions = {
   sales_disabled: 'El historial de ventas no está habilitado para esta sesión.',
   access_denied: 'La sesión no tiene acceso al historial de ventas.',
   processing_error: 'No se pudo procesar el historial. Vuelve a cargar el inventario.',
+  migration_missing: 'La verificación comercial todavía no está habilitada. No hay predicciones disponibles.',
+  connection_error: 'No se pudo conectar con el servicio de evidencias. Vuelve a cargar el inventario.',
+  invalid_evidence: 'Las evidencias recibidas son inválidas o están incompletas. No se utilizan para pronosticar.',
+  evidence_error: 'No se pudieron consultar las evidencias. Vuelve a cargar el inventario.',
 };
 
 function Pagination({ page, pages, setPage, label }) {
@@ -31,7 +35,8 @@ function Pagination({ page, pages, setPage, label }) {
 }
 
 export default function Prediccion({ products = EMPTY, sales = EMPTY, salesEnabled = false,
-  status = 'ready', historyAccess, predictionEvidence, asOf, initialHorizon = 7 }) {
+  status = 'ready', historyAccess, predictionEvidence, evidenceState, asOf, initialHorizon = 7,
+  predictionControls, predictionNotice }) {
   const id = useId();
   const [openedAt, setOpenedAt] = useState(() => new Date().toISOString());
   useEffect(() => {
@@ -49,21 +54,25 @@ export default function Prediccion({ products = EMPTY, sales = EMPTY, salesEnabl
   // Stock/label edits update presentation without repeating historical backtests.
   const catalogKey = Array.isArray(products) ? JSON.stringify(products.map(product => ({ id: product?.id, isActive: product?.isActive !== false }))) : 'null';
   const view = useMemo(() => preparePredictionView({ products: JSON.parse(catalogKey), sales,
-    salesEnabled, status, historyAccess, asOf: snapshotAt, evidence: predictionEvidence }),
-  [catalogKey, sales, salesEnabled, status, historyAccess, snapshotAt, predictionEvidence]);
+    salesEnabled, status, historyAccess, asOf: snapshotAt, evidence: predictionEvidence, evidenceState }),
+  [catalogKey, sales, salesEnabled, status, historyAccess, snapshotAt, predictionEvidence, evidenceState]);
   const result = useMemo(() => evaluatePredictionView(view, horizon), [view, horizon]);
   const current = Array.isArray(products) ? products.filter(product => Number.isSafeInteger(product?.id) && product.id > 0) : [];
   const byId = new Map(result.forecasts.map(row => [row.productId, row]));
   const state = predictionAvailability(result, new Set(current.map(product => product.id)));
+  const description = state === 'access_denied' && evidenceState === 'access_denied' && historyAccess !== 'denied'
+    ? 'La sesión no tiene permiso para consultar las evidencias de predicción.' : descriptions[state];
   const eligible = current.filter(product => product.isActive !== false && byId.get(product.id)?.eligible);
   const forecastPages = Math.max(1, Math.ceil(eligible.length / 12));
   const activeForecastPage = Math.min(forecastPage, forecastPages);
   const cutoff = result.forecasts.find(row => row.cutoff)?.cutoff;
 
-  if (status === 'loading') return <InventoryLoading label="Cargando predicción de demanda" />;
+  if (view.state === 'loading') return <>{predictionControls && <div className={styles.loadingControls}>{predictionControls}</div>}<InventoryLoading label="Cargando predicción de demanda" /></>;
   return <div className={`${s.page} ${ui.workspace} ${styles.workspace}`}>
+    {predictionNotice}
     <header className={`${s.header} ${ui.heading} ${styles.heading}`}>
       <div><h1>Predicción de demanda</h1></div>
+      {predictionControls}
       <label className={styles.horizon} htmlFor={`${id}-horizon`}>Horizonte
         <select id={`${id}-horizon`} value={horizon} onChange={event => {
           setHorizon(Number(event.target.value)); setForecastPage(1);
@@ -71,10 +80,10 @@ export default function Prediccion({ products = EMPTY, sales = EMPTY, salesEnabl
       </label>
     </header>
     <section className={`${styles.availability} ${eligible.length ? styles.available : ''}`}
-      role={state === 'processing_error' ? 'alert' : 'status'} aria-live="polite" data-prediction-state={state}>
+      role={['processing_error', 'connection_error', 'invalid_evidence', 'evidence_error'].includes(state) ? 'alert' : 'status'} aria-live="polite" data-prediction-state={state}>
       {!eligible.length && <CircleAlert size={28} aria-hidden="true" />}
       <div><h2>{eligible.length ? 'Predicciones disponibles' : 'Predicciones no disponibles'}</h2>
-        <p>{eligible.length ? `${eligible.length} productos con pronóstico para ${horizon} días.` : descriptions[state]}</p>
+        <p>{eligible.length ? `${eligible.length} productos con pronóstico para ${horizon} días.` : description}</p>
       </div>
     </section>
     {eligible.length > 0 && <section aria-label={`Pronósticos a ${horizon} días`}>

@@ -10,7 +10,7 @@ export async function api(path, { method = 'GET', body, rawBody, signal } = {}) 
   }
   let data;
   try { data = await response.json(); }
-  catch { throw Object.assign(new Error('Respuesta incompleta del servidor. Reintenta la operación.'), { uncertain: method !== 'GET' }); }
+  catch { throw Object.assign(new Error('Respuesta incompleta del servidor. Reintenta la operación.'), { code: 'INVALID_RESPONSE', status: response.status, uncertain: method !== 'GET' }); }
   if (!response.ok) {
     if (response.status === 401 && path !== '/auth/login') window.dispatchEvent(new CustomEvent('session-changed', { detail: null }));
     throw Object.assign(new Error(data.error || 'No se pudo completar la operación.'), {

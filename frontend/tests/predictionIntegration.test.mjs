@@ -191,4 +191,21 @@ test('prediction screen renders correct states and eligible values with the real
     assert.ok(html.includes('Página 1 de 2') && html.includes('Paginación de pronósticos'));
     assert.ok(!html.includes('<details') && !html.includes('<table'));
   });
+  await t.test('evidence read states use the existing empty card and suppress previously eligible results', () => {
+    const props = predictionFixture();
+    for (const [evidenceState, message] of [
+      ['migration_missing', 'La verificación comercial todavía no está habilitada'],
+      ['access_denied', 'La sesión no tiene permiso para consultar las evidencias de predicción.'],
+      ['connection_error', 'No se pudo conectar con el servicio de evidencias'],
+      ['invalid_evidence', 'Las evidencias recibidas son inválidas'],
+      ['evidence_error', 'No se pudieron consultar las evidencias'],
+    ]) {
+      const html = render({ ...props, evidenceState });
+      assert.ok(html.includes(`data-prediction-state="${evidenceState}"`) && html.includes(message));
+      assert.ok(html.includes('Predicciones no disponibles'));
+      for (const removed of ['<article', '<table', '<details', 'type="search"', 'Consultar estado por producto']) assert.ok(!html.includes(removed));
+      assert.equal((html.match(/<section/g) ?? []).length, 1);
+    }
+    assert.ok(render({ ...props, evidenceState: 'loading' }).includes('Cargando predicción de demanda'));
+  });
 });

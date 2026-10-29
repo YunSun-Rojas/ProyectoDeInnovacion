@@ -1,5 +1,6 @@
 export function createInventoryRoutes(controller) {
   return [
+    { method: 'GET', path: '/api/inventory/prediction-evidence', handler: controller.predictionEvidence },
     { method: 'GET', path: '/api/inventory/reports', handler: controller.reports },
     { method: 'GET', path: '/api/inventory/alerts', handler: controller.alerts },
     { method: 'GET', path: '/api/inventory/physical', handler: controller.physicalList },

@@ -1,5 +1,6 @@
 import { readInventory, mutateInventory, readReportCounts } from './inventoryRepository.js';
 export { readPendingDifferences as loadPendingDifferences } from './inventoryRepository.js';
+export { readPredictionEvidence as loadPredictionEvidence } from './predictionEvidenceRepository.js';
 import { catalogPatch, money } from '../../../../shared/catalogProduct.js';
 
 export async function loadReports(client, userId) {

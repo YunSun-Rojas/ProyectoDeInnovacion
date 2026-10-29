@@ -2,6 +2,9 @@ import { readBody, fail } from '../../utils/http.js';
 
 export function createInventoryController(inventory) {
   return {
+    async predictionEvidence({ session: { client, user }, send }) {
+      send(200, await inventory.loadPredictionEvidence(client, user.id));
+    },
     async reports({ session: { client, user }, send }) {
       send(200, await inventory.loadReports(client, user.id));
     },

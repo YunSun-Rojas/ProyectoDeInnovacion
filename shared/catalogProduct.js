@@ -1,9 +1,8 @@
-// Contrato preparado para Fase 2B. No conectado a rutas ni RPC de producción.
+// Validación de catálogo compartida por formularios y backend.
 export const CATALOG_CONTRACT_VERSION = 1;
 export const CATALOG_TEXT_LIMITS = Object.freeze({
   brand: 120, model: 160, characteristics: 4000, barcode: 100, unitOfMeasure: 40,
 });
-const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 
 export function money(value, label, optional = false) {
   if (optional && (value === null || value === '')) return null;
@@ -30,7 +29,7 @@ export function catalogPatch(data, { canWritePurchaseCost = false } = {}) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Datos de catálogo inválidos.');
   const patch = {};
   for (const [field, limit] of Object.entries(CATALOG_TEXT_LIMITS)) {
-    if (!own(data, field)) continue;
+    if (!Object.hasOwn(data, field)) continue;
     const value = data[field];
     if (value !== null && typeof value !== 'string') throw new Error(`${field}: texto inválido.`);
     const normalized = value?.trim() || null;
@@ -38,15 +37,15 @@ export function catalogPatch(data, { canWritePurchaseCost = false } = {}) {
     if (field === 'unitOfMeasure' && !normalized) throw new Error('La unidad de medida es obligatoria.');
     patch[field] = normalized;
   }
-  if (own(data, 'purchaseCost')) {
+  if (Object.hasOwn(data, 'purchaseCost')) {
     if (!canWritePurchaseCost) throw new Error('No tienes permiso para modificar el costo de compra.');
     patch.purchaseCost = money(data.purchaseCost, 'Costo de compra', true);
   }
-  if (own(data, 'isActive')) {
+  if (Object.hasOwn(data, 'isActive')) {
     if (typeof data.isActive !== 'boolean') throw new Error('El estado administrativo debe ser activo o inactivo.');
     patch.isActive = data.isActive;
   }
-  if (own(data, 'imagePath')) throw new Error('La carga de fotografías todavía no está habilitada.');
+  if (Object.hasOwn(data, 'imagePath')) throw new Error('La carga de fotografías todavía no está habilitada.');
   return patch;
 }
 

@@ -6,7 +6,7 @@ import { LoginPage } from "./modules/auth/pages/LoginPage";
 import InventarioLayout from "./modules/inventario/InventarioLayout";
 import Dashboard from "./modules/inventario/pages/Dashboard";
 import Productos from "./modules/inventario/pages/Productos";
-import Prediccion from "./modules/inventario/pages/Prediccion";
+import PrediccionConDemoLocal from "./modules/inventario/pages/PrediccionConDemoLocal";
 import Vision from "./modules/inventario/pages/Vision";
 import Historial from "./modules/inventario/pages/Historial";
 import Existencias from "./modules/inventario/pages/Existencias";
@@ -29,7 +29,7 @@ function ProductosRoute({ currentUser }) {
   return <Productos {...useOutletContext()} currentUser={currentUser} />;
 }
 function PrediccionRoute() {
-  return <Prediccion {...useOutletContext()} />;
+  return <PrediccionConDemoLocal {...useOutletContext()} />;
 }
 
 function HistorialRedirect() {

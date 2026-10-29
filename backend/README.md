@@ -18,6 +18,7 @@ Supabase. Iniciarla no crea tablas, no importa productos y no ejecuta pruebas.
 | `src/modules/inventory/inventoryController.js` | Validar solicitudes y coordinar consultas y cambios |
 | `src/modules/inventory/inventoryService.js` | Validar y transformar datos y resultados de guardado |
 | `src/modules/inventory/inventoryRepository.js` | Consultar tablas paginadas, permisos y funciones RPC |
+| `src/modules/inventory/predictionEvidenceRepository.js` | Leer evidencias con el cliente de la sesión y distinguir ausencia, denegación y errores |
 | `src/middleware/authMiddleware.js` | Validar la sesión antes de ejecutar una ruta protegida |
 | `src/utils/http.js` | Leer JSON, comprobar el origen y construir errores HTTP |
 | `scripts/check-connection.js` | Comprobar manualmente la conexión con Supabase |
@@ -59,7 +60,14 @@ No se guardan contraseñas ni se envían tokens al frontend.
 | PATCH | /api/auth/account | Actualizar perfil o contraseña |
 | POST | /api/auth/reauthenticate | Solicitar código de verificación |
 | GET | /api/inventory | Consultar productos, categorías e historial |
+| GET | /api/inventory/prediction-evidence | Consultar evidencias predictivas autenticadas |
+| GET | /api/inventory/reports | Consultar inventario e historial de conteos para reportes |
+| GET | /api/inventory/alerts | Consultar diferencias pendientes de conteos |
+| GET | /api/inventory/physical | Consultar sesiones de inventario físico |
+| POST | /api/inventory/physical | Operar una sesión de inventario físico |
 | POST | /api/inventory/changes | Agregar, editar, eliminar, ajustar stock o registrar una venta |
+| GET | /api/vision/model | Consultar metadatos del modelo Python local |
+| POST | /api/vision/detect | Enviar una imagen al servicio Python local |
 
 El usuario de una operación se obtiene de la sesión verificada; no se acepta
 un identificador de usuario enviado por el navegador. Una cuenta debe estar
@@ -77,7 +85,9 @@ sin impedir consultar el inventario existente.
 
 ## Pruebas
 
-Desde la raíz, `npm test` ejecuta los tests de API y servicios sin datos reales.
+Desde la raíz, `npm run test:backend` ejecuta los tests de API y servicios aislados;
+`npm run test:frontend` verifica interfaz y preparación de datos. `npm test` ejecuta
+ambas baterías. Ninguna conecta a Supabase real.
 Las pruebas de API simulan respuestas para comprobar el código;
 `tests/salesSql.test.js` usa PostgreSQL en memoria con PGlite para comprobar la
 transacción de venta. Ninguna se conecta al proyecto real.
@@ -103,3 +113,8 @@ instancia. Para varias réplicas o sesiones que sobrevivan reinicios se necesita
 un almacén compartido de sesiones. No habilita actualización automática entre
 navegadores: las lecturas se actualizan al entrar o recargar y las escrituras
 confirmadas actualizan inmediatamente la pantalla que las realizó.
+
+El inventario de SQL, las comprobaciones de evidencias y las condiciones de rollback
+se mantienen en [prediction_evidence_deployment.md](tests/sql/prediction_evidence_deployment.md).
+Los nombres históricos `.proposed.sql` se conservan aunque una migración ya esté
+aplicada. No ejecutar esos archivos de nuevo sobre una instalación existente.

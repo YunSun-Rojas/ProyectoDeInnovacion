@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
+import { validatePredictionEvidence } from '../../shared/predictionEvidence.js';
 import { preparePredictionView, evaluatePredictionView } from '../../frontend/src/modules/inventario/pages/predictionViewData.js';
 
 // Entirely synthetic, in-memory PostgreSQL. Never loads .env or contacts Supabase.
@@ -282,6 +283,7 @@ test('pending prediction migration: authorization, append-only audit, availabili
     await as(member);
     const officialEvidence = await evidence();
     const now = (await db.query('SELECT statement_timestamp()::text AS time')).rows[0].time;
+    assert.deepEqual(validatePredictionEvidence(officialEvidence, new Date(now).toISOString()), officialEvidence);
     const sales = rows.map(row => ({ id: row.id, productId: row.product_id, date: new Date(row.created_at).toISOString(),
       quantity: row.quantity, product: 'Synthetic historical product', sku: 'SYN-7', movementId: `synthetic-${row.id}` }));
     const view = preparePredictionView({ products: [{ id: 7, name: 'Synthetic current product', sku: 'SYN-7', isActive: true }],

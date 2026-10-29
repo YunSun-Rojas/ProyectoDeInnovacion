@@ -1,5 +1,7 @@
 .workspace { background-image:none; min-width:0; }
 .heading h1 { margin-bottom:6px; }
+.demoNotice { position:sticky; top:0; z-index:10; padding:12px 18px; margin-bottom:18px; border:1px solid #e7cd83; border-radius:10px; background:#fff4cc; color:#624400; font-size:13px; }
+.loadingControls { display:flex; justify-content:flex-end; padding:18px 24px; }
 .horizon { display:flex; align-items:center; gap:12px; font-size:12px; color:var(--ui-muted); font-weight:600; }
 .horizon select { min-width:120px; }
 .availability { padding:48px 24px; border:1px solid var(--ui-line); border-radius:14px; background:var(--ui-surface); text-align:center; margin-bottom:24px; }
