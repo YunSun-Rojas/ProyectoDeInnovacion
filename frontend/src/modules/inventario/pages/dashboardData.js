@@ -9,14 +9,28 @@ export function limaDate(value) {
 export const DATE_RANGES = [
   { id: 'today', label: 'Hoy', shortLabel: 'hoy' },
   { id: '7', label: 'Últimos 7 días', shortLabel: '7d' },
+  { id: '30', label: 'Últimos 30 días', shortLabel: '30d' },
   { id: 'month', label: 'Este mes', shortLabel: 'mes' },
   { id: 'quarter', label: 'Trimestre actual', shortLabel: 'trim' },
+  { id: 'custom', label: 'Rango personalizado', shortLabel: 'rango' },
 ];
 
-export function periodRange(period, today) {
+export function periodRange(period, today, customRange) {
   if (period === 'today') return { from: today, to: today };
+  if (period === 'custom') {
+    const validDate = value => {
+      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+      const date = new Date(`${value}T00:00:00Z`);
+      return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+    };
+    if (!validDate(customRange?.from) || !validDate(customRange?.to) || customRange.from > customRange.to) {
+      return { error: 'Selecciona un rango de fechas válido.' };
+    }
+    return { from: customRange.from, to: customRange.to };
+  }
   const start = new Date(`${today}T12:00:00Z`);
   if (period === '7') start.setUTCDate(start.getUTCDate() - 6);
+  else if (period === '30') start.setUTCDate(start.getUTCDate() - 29);
   else if (period === 'quarter') {
     start.setUTCDate(1);
     start.setUTCMonth(Math.floor(start.getUTCMonth() / 3) * 3);
@@ -26,16 +40,35 @@ export function periodRange(period, today) {
 
 export function summarizeInventory(products, fallback = 5) {
   const attention = products.filter(p => numeric(p.stock) <= minimumStock(p, fallback))
-    .sort((a, b) => numeric(a.stock) - numeric(b.stock) || String(a.name).localeCompare(String(b.name), 'es'));
-  const values = new Map();
-  products.forEach(p => values.set(p.category || 'Sin categoría', (values.get(p.category || 'Sin categoría') || 0) + numeric(p.stock) * numeric(p.price)));
+    .sort((a, b) => {
+      const aEmpty = numeric(a.stock) <= 0, bEmpty = numeric(b.stock) <= 0;
+      if (aEmpty !== bEmpty) return aEmpty ? -1 : 1;
+      const aRatio = numeric(a.stock) / Math.max(1, minimumStock(a, fallback));
+      const bRatio = numeric(b.stock) / Math.max(1, minimumStock(b, fallback));
+      return aRatio - bRatio || String(a.name).localeCompare(String(b.name), 'es');
+    });
+  const unitValue = p => p.purchaseCost == null ? numeric(p.price) : numeric(p.purchaseCost);
   return {
     units: products.reduce((sum, p) => sum + numeric(p.stock), 0),
-    value: products.reduce((sum, p) => sum + numeric(p.stock) * numeric(p.price), 0),
+    value: products.reduce((sum, p) => sum + numeric(p.stock) * unitValue(p), 0),
     low: products.filter(p => numeric(p.stock) > 0 && numeric(p.stock) <= minimumStock(p, fallback)).length,
-    empty: products.filter(p => numeric(p.stock) === 0).length,
+    empty: products.filter(p => numeric(p.stock) <= 0).length,
     attention,
-    categories: [...values].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value),
+  };
+}
+
+export function summarizeInventoryCost(products) {
+  const costOf = product => {
+    if (product.purchaseCost == null || product.purchaseCost === '') return null;
+    const cost = Number(product.purchaseCost);
+    return Number.isFinite(cost) && cost >= 0 ? cost : null;
+  };
+  const missingCosts = products.filter(product => numeric(product.stock) > 0 && costOf(product) === null).length;
+  return {
+    value: missingCosts === 0
+      ? products.reduce((sum, product) => sum + numeric(product.stock) * (costOf(product) ?? 0), 0)
+      : null,
+    missingCosts,
   };
 }
 

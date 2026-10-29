@@ -47,7 +47,8 @@ DECLARE
   request jsonb := jsonb_build_object('action',p_kind,'product_id',p_product_id,
     'version',p_expected_version,'data',jsonb_build_object('quantity',p_quantity,'reason',p_reason));
 BEGIN
-  IF actor IS NULL OR NOT EXISTS (SELECT 1 FROM public.inventory_members WHERE user_id=actor) THEN
+  IF actor IS NULL OR NOT EXISTS (SELECT 1 FROM public.inventory_members WHERE user_id=actor)
+    OR public.inventory_write_enabled() IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'INVENTORY_FORBIDDEN' USING errcode='42501';
   END IF;
   IF p_request_id IS NULL OR p_product_id IS NULL OR p_product_id<=0

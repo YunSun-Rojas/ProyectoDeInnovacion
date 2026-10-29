@@ -78,6 +78,13 @@ test('componentes aislados: campos, permisos, stock de consulta y guardado bloqu
   const renderHistory = (movements, url = '/movimientos', extra = {}) => renderToStaticMarkup(createElement(MemoryRouter, { initialEntries: [url] }, createElement(Routes, null,
     createElement(Route, { element: createElement(Outlet, { context: { products: [product], movements, ...extra } }) },
       createElement(Route, { path: '/movimientos', element: createElement(Historial) })))));
+  const renderStockAction = action => renderToStaticMarkup(createElement(MemoryRouter, {
+    initialEntries: [`/existencias?accion=${action}`],
+  }, createElement(Routes, null,
+    createElement(Route, { element: createElement(Outlet, { context: {
+      products: [product], movements: [], status: 'ready', stockEnabled: true, readOnly: false,
+    } }) },
+    createElement(Route, { path: '/existencias', element: createElement(Existencias) })))));
   await t.test('Movimientos: siete columnas, cuatro filtros, conteos originales e historial retirado intacto', () => {
     const movements = [
       { id: 60, productId: 99, product: 'Mouse retirado', sku: 'M1', date: '2026-10-20T03:30:00Z', type: 'Entrada', quantity: 5, before: 0, after: 5, reason: 'Compra', user: 'autor@historico.test' },
@@ -153,6 +160,14 @@ test('componentes aislados: campos, permisos, stock de consulta y guardado bloqu
     assert(!html.includes('/dashboard/productos'));
     assert.equal((html.match(/<input/g) || []).length, 0);
     assert(html.includes('Actualizar') && html.includes('Registrar movimiento'));
+  });
+  await t.test('Accesos rápidos de entrada y salida abren el movimiento con el tipo correcto', () => {
+    for (const [action, type] of [['entrada', 'stock_in'], ['salida', 'stock_out']]) {
+      const html = renderStockAction(action);
+      assert(html.includes('<dialog'));
+      assert.match(html, new RegExp(`<option value="${type}" selected="">`));
+      assert(html.includes('Selecciona un producto'));
+    }
   });
   await t.test('ficha de movimientos muestra varias operaciones reales por ID y detalle de solo lectura', () => {
     const movements = [{ id: 100, productId: 1, product: 'Mouse histórico', sku: 'OLD', type: 'Salida', quantity: -3, before: 10, after: 7, reason: 'Venta local', date: '2026-10-20T03:30:00Z', user: 'operador@local.test' },
@@ -232,19 +247,27 @@ test('componentes aislados: campos, permisos, stock de consulta y guardado bloqu
     assert(!render(true).includes('<dialog'));
     assert.equal(calls, 0);
   });
-  await t.test('listado compacto, siete columnas, dos tarjetas y paginación legible', () => {
+  await t.test('listado compacto, siete columnas, cuatro tarjetas y paginación legible', () => {
     const products = Array.from({ length: 36 }, (_, i) => ({ ...product, id: i + 1, sku: `M${i}` }));
     const render = (items, url = '/productos') => renderToStaticMarkup(createElement(MemoryRouter, { initialEntries: [url] }, createElement(Productos, { products: items })));
     const html = render(products, '/productos?pagina=2');
     assert(!html.includes('Registrado por'));
     assert(!html.includes('Resumen general'));
     assert(!html.includes('>CATÁLOGO<'));
-    assert.equal((html.match(/class="inv-stat"/g) || []).length, 2);
+    assert.equal((html.match(/class="inv-stat"/g) || []).length, 4);
+    assert(html.includes('Stock bajo') && html.includes('Valorizado'));
     assert.equal((html.match(/<th scope=/g) || []).length, 7);
     assert(html.includes('Página 2 de 3'));
     assert(html.includes('Anterior') && html.includes('Siguiente'));
     assert(render([]).includes('colSpan="7"'));
     assert.equal((html.match(/<input /g) || []).length, 1, 'solo búsqueda global, sin buscadores en filtros');
+
+    const summary = render([
+      { ...product, id: 1, isActive: true, stock: 2, minStock: 5, price: 100 },
+      { ...product, id: 2, isActive: true, stock: 0, minStock: 5, price: 50 },
+    ]);
+    assert.match(summary, /<span>Stock bajo<\/span><strong>1<\/strong>/);
+    assert(summary.includes('200.00'), 'el valorizado coincide con stock × precio unitario');
   });
   await t.test('confirmación de eliminación identifica producto, espera real y errores', () => {
     const render = props => renderToStaticMarkup(createElement(DeleteProductDialog, { product, ...props }));

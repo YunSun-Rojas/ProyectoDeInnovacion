@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { limaDate, periodRange, summarizeInventory, summarizeMovements, movementFlow, movementError } from '../src/modules/inventario/pages/dashboardData.js';
+import { limaDate, periodRange, summarizeInventory, summarizeInventoryCost, summarizeMovements, movementFlow, movementError } from '../src/modules/inventario/pages/dashboardData.js';
 
 test('Las altas y ediciones de stock aparecen en todos los períodos correspondientes, sin duplicar cantidades', () => {
   const movements = [
@@ -23,7 +23,7 @@ test('Las altas y ediciones de stock aparecen en todos los períodos correspondi
   assert.deepEqual(movementFlow({ type: 'Desconocido', quantity: 999 }), { entries: 0, exits: 0 });
 });
 
-test('Stock bajo y agotados no se superponen y el valor usa existencias actuales', () => {
+test('Stock bajo y agotados no se superponen y el valor legado usa las existencias actuales', () => {
   const result = summarizeInventory([
     { name: 'A', stock: 0, minStock: 5, price: 10, category: 'Audio' },
     { name: 'B', stock: 5, minStock: 5, price: 10, category: 'Audio' },
@@ -35,12 +35,31 @@ test('Stock bajo y agotados no se superponen y el valor usa existencias actuales
   assert.equal(result.units, 17);
   assert.equal(result.value, 260);
   assert.deepEqual(result.attention.map(p => p.name), ['A', 'D', 'B']);
-  assert.deepEqual(result.categories, [{ name: 'Video', value: 200 }, { name: 'Audio', value: 60 }]);
 });
 
 test('Períodos inclusivos y fechas de Lima, incluso alrededor de medianoche UTC', () => {
   assert.equal(limaDate('2026-10-13T02:00:00Z'), '2026-10-12');
   assert.deepEqual(periodRange('7', '2026-10-13'), { from: '2026-10-07', to: '2026-10-13' });
+  assert.deepEqual(periodRange('30', '2026-10-13'), { from: '2026-09-14', to: '2026-10-13' });
+  assert.deepEqual(periodRange('custom', '2026-10-13', { from: '2026-09-20', to: '2026-10-05' }), { from: '2026-09-20', to: '2026-10-05' });
+  assert.ok(periodRange('custom', '2026-10-13', { from: '2026-10-06', to: '2026-10-05' }).error);
+  assert.ok(periodRange('custom', '2026-10-13', { from: '2026-02-30', to: '2026-10-05' }).error);
+});
+
+test('La valorización del panel usa solo costos de compra completos y no sustituye precios de venta', () => {
+  assert.deepEqual(summarizeInventoryCost([
+    { stock: 3, purchaseCost: 10 },
+    { stock: 2, purchaseCost: 4.5, price: 99 },
+  ]), { value: 39, missingCosts: 0 });
+  assert.deepEqual(summarizeInventoryCost([
+    { stock: 3, purchaseCost: 10 },
+    { stock: 2, purchaseCost: null, price: 99 },
+  ]), { value: null, missingCosts: 1 });
+  assert.deepEqual(summarizeInventoryCost([
+    { stock: 3, purchaseCost: 10 },
+    { stock: 0, purchaseCost: null, price: 99 },
+  ]), { value: 30, missingCosts: 0 });
+  assert.deepEqual(summarizeInventoryCost([]), { value: 0, missingCosts: 0 });
 });
 
 test('Entradas y salidas reales incluyen el stock inicial y dejan días sin actividad en cero', () => {
