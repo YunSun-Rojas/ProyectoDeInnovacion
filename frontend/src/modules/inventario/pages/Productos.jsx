@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import SaleDialog from "../components/SaleDialog";
 import ProductDetailsDialog from "../components/catalog/ProductDetailsDialog";
 import ProductForm from "../components/catalog/ProductForm";
@@ -17,6 +17,8 @@ import {
   Boxes,
   AlertTriangle,
   CircleDollarSign,
+  PackagePlus,
+  ArrowRightLeft,
   Download,
   ChevronLeft,
   ChevronRight,
@@ -179,6 +181,8 @@ const STYLES = `
   cursor: pointer;
 }
 
+.inv-actions a.inv-button { text-decoration: none; }
+
 .inv-button:hover:not(:disabled) {
   border-color: #b4bac3;
   background: var(--inventory-bg, #f5f6f8);
@@ -194,6 +198,13 @@ const STYLES = `
   background: #c91e2d;
   border-color: #c91e2d;
 }
+
+.inv-kardex-entry { color: #009688; }
+.inv-kardex-entry:hover:not(:disabled) { color: #00796b; border-color: #80cbc4; background: #f0fdfa; }
+.inv-kardex-view { color: #087dcc; }
+.inv-kardex-view:hover:not(:disabled) { color: #075fa0; border-color: #90caf9; background: #eff8ff; }
+.inv-product-create { background: #1d5eff; border-color: #1d5eff; }
+.inv-product-create:hover:not(:disabled) { background: #174bd1; border-color: #174bd1; }
 
 .inv-page button:disabled, .inv-dialog button:disabled {
   opacity: .45;
@@ -699,7 +710,7 @@ const STYLES = `
   .inv-stat-icon svg { width: 14px; height: 14px; }
   .inv-header h1 { font-size: 24px; }
   .inv-actions { width: 100%; }
-  .inv-actions > button { flex: 1; }
+  .inv-actions > button, .inv-actions > a { flex: 1; }
   .inv-pagination > div { gap: 7px; }
   .inv-overlay { padding: 12px; }
   .inv-dialog { max-height: calc(100dvh - 24px); }
@@ -1043,6 +1054,33 @@ export default function Productos({
         </div>
 
         <div className="inv-actions">
+          <Link
+            className="inv-button inv-kardex-entry"
+            to="/dashboard/existencias?accion=entrada"
+          >
+            <PackagePlus size={16} aria-hidden="true" />
+            Ingreso a Kardex
+          </Link>
+
+          <Link
+            className="inv-button inv-kardex-view"
+            to="/dashboard/kardex"
+          >
+            <ArrowRightLeft size={16} aria-hidden="true" />
+            Ver Kardex
+          </Link>
+
+          <button
+            type="button"
+            className="inv-button inv-primary inv-product-create"
+            ref={newButton}
+            disabled={!canCreate}
+            onClick={(event) => openModal(null, event)}
+          >
+            <Plus size={17} />
+            Nuevo producto
+          </button>
+
           <button
             type="button"
             className="inv-button"
@@ -1051,17 +1089,6 @@ export default function Productos({
           >
             <Download size={16} />
             Exportar CSV
-          </button>
-
-          <button
-            ref={newButton}
-            type="button"
-            className="inv-button inv-primary"
-            disabled={!canCreate}
-            onClick={(event) => openModal(null, event)}
-          >
-            <Plus size={17} />
-            Nuevo producto
           </button>
         </div>
       </header>

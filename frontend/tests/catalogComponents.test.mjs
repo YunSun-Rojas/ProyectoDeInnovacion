@@ -256,6 +256,9 @@ test('componentes aislados: campos, permisos, stock de consulta y guardado bloqu
     assert(!html.includes('>CATÁLOGO<'));
     assert.equal((html.match(/class="inv-stat"/g) || []).length, 4);
     assert(html.includes('Stock bajo') && html.includes('Valorizado'));
+    assert.match(html, /href="\/dashboard\/existencias\?accion=entrada"[^>]*>.*Ingreso a Kardex/);
+    assert.match(html, /href="\/dashboard\/kardex"[^>]*>.*Ver Kardex/);
+    assert(html.includes('Nuevo producto'));
     assert.equal((html.match(/<th scope=/g) || []).length, 7);
     assert(html.includes('Página 2 de 3'));
     assert(html.includes('Anterior') && html.includes('Siguiente'));
