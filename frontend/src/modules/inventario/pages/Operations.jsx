@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CalendarDays, CircleAlert, Eye, Plus, RefreshCw, Search, ShoppingBag, ShoppingCart, Truck, X } from 'lucide-react';
+import { money } from '../../../../../shared/catalogProduct.js';
 import { loadCommerce, saveCommerce } from '../api/commerceApi';
 import s from './Operations.module.css';
 
@@ -12,6 +13,17 @@ const makeId = () => crypto.randomUUID();
 const quantity = value => new Intl.NumberFormat('es-PE').format(Number(value) || 0);
 const currency = value => new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(Number(value) || 0);
 const displayDate = value => value ? new Date(`${String(value).slice(0, 10)}T12:00:00-05:00`).toLocaleDateString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+function validLine(line) {
+  const units = Number(line.quantity);
+  if (!line.productId || !Number.isSafeInteger(units) || units <= 0 || units > 2147483647) return false;
+  try {
+    money(line.price.replace(/^\./, '0.'), 'Importe');
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export default function Operations({ kind }) {
   const isPurchase = kind === 'purchase';
@@ -29,7 +41,7 @@ export default function Operations({ kind }) {
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState(null);
   const [pending, setPending] = useState(null);
-  const lock = useRef(false);
+  const request = useRef({ inFlight: false, draft: null });
   const abortRef = useRef(null);
   const docs = isPurchase ? data.purchases : data.sales;
   const load = useCallback(() => {
@@ -52,10 +64,12 @@ export default function Operations({ kind }) {
   const visible = filtered.slice((page - 1) * 10, page * 10);
 
   const run = async body => {
-    if (lock.current) return;
-    lock.current = true; setBusy(true); setError('');
+    const current = request.current;
+    if (current.inFlight || (current.draft && current.draft !== body)) return false;
+    current.inFlight = true; setBusy(true); setError('');
     try {
-      await saveCommerce(body); setPending(null); await refresh();
+      await saveCommerce(body);
+      current.draft = null; setPending(null); await refresh();
       if (body.action !== 'create' && body.kind !== 'supplier') retry?.();
       if (body.kind === 'supplier') notify?.('Proveedor guardado.');
       else notify?.(body.action === 'create' ? 'Documento creado como pendiente.' : body.action === 'receive' ? 'Compra recibida y stock actualizado.' : body.action === 'confirm' ? 'Venta confirmada y stock actualizado.' : 'Documento cancelado.');
@@ -63,11 +77,15 @@ export default function Operations({ kind }) {
       return true;
     } catch (reason) {
       setError(reason.message || 'No se pudo guardar el documento.');
-      if (reason.uncertain) setPending(body);
+      if (reason.uncertain) {
+        if (body.action === 'create') current.draft = body;
+        setPending(body);
+      }
       return false;
-    } finally { lock.current = false; setBusy(false); }
+    } finally { current.inFlight = false; setBusy(false); }
   };
   const submitCreate = async (form, lines, supplier) => {
+    if (request.current.inFlight || request.current.draft) return;
     const id = makeId();
     const body = { kind, action: 'create', id, data: {
       ...(isPurchase ? { supplierId: supplier.id || null, supplierName: supplier.name || '' } : { customer: supplier.name || '' }),
@@ -77,8 +95,7 @@ export default function Operations({ kind }) {
         ...(isPurchase ? { unit_cost: Number(line.price) } : { unit_price: Number(line.price) }),
       })),
     } };
-    const ok = await run(body);
-    if (ok) setCreating(false);
+    await run(body);
   };
   const act = async (doc, action) => {
     const labels = { receive: '¿Confirmas la recepción? Esto sumará las unidades al stock.', confirm: '¿Confirmas esta venta? Se descontarán las unidades del stock.', cancel: '¿Cancelar este documento? Si ya afectó el stock, se registrará una reversión auditada.' };
@@ -113,7 +130,9 @@ export default function Operations({ kind }) {
         <div className={s.pagination}><span>{quantity(filtered.length)} documentos · Página {page} de {pageCount}</span><div><button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}><ArrowLeft size={15} /> Anterior</button><button type="button" onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page >= pageCount}>Siguiente <ArrowRight size={15} /></button></div></div>
       </> : <div className={s.empty}><ShoppingBag size={32} /><strong>{error ? 'No se pudo cargar la lista' : 'Aún no hay documentos'}</strong><p>{error ? 'Verifica que la migración esté aplicada y que el backend pueda acceder a Supabase.' : 'Crea el primer documento para comenzar a registrar operaciones reales.'}</p>{!error && <button type="button" className={s.secondary} onClick={() => setCreating(true)} disabled={readOnly}><Plus size={15} /> Nueva {isPurchase ? 'compra' : 'venta'}</button>}</div>}
     </section>
-    {creating && <OperationForm kind={kind} products={products} suppliers={data.suppliers} busy={busy} serverError={error} pending={pending} onRetry={async () => { const body = pending; if (!body) return null; return await run(body) ? body : null; }} onClose={() => !busy && setCreating(false)} onSubmit={submitCreate} onSupplier={async name => {
+    {creating && <OperationForm kind={kind} products={products} suppliers={data.suppliers} busy={busy} serverError={error} pending={pending} onRetry={async () => { const body = pending; if (!body) return null; return await run(body) ? body : null; }} onClose={() => {
+      if (!request.current.inFlight && !request.current.draft) setCreating(false);
+    }} onSubmit={submitCreate} onSupplier={async name => {
       const id = makeId(); const ok = await run({ kind: 'supplier', action: 'save', id, data: { name } }); return ok ? { id, name } : null;
     }} />}
     {selected && <DetailDialog doc={selected} kind={kind} busy={busy} readOnly={readOnly} error={error} pending={pending} onRetry={async () => pending && await run(pending)} onClose={() => setSelected(null)} onAction={act} />}
@@ -122,6 +141,7 @@ export default function Operations({ kind }) {
 
 function OperationForm({ kind, products, suppliers, busy, serverError, pending, onRetry, onClose, onSubmit, onSupplier }) {
   const isPurchase = kind === 'purchase';
+  const draftPending = pending?.action === 'create';
   const [date, setDate] = useState(today()); const [reference, setReference] = useState(''); const [notes, setNotes] = useState('');
   const [supplierId, setSupplierId] = useState(''); const [supplierName, setSupplierName] = useState(''); const [newSupplier, setNewSupplier] = useState(false);
   const [customer, setCustomer] = useState(''); const [lines, setLines] = useState([{ productId: '', quantity: '1', price: '' }]); const [error, setError] = useState('');
@@ -132,8 +152,10 @@ function OperationForm({ kind, products, suppliers, busy, serverError, pending, 
     updateLine(index, { productId: id, price: isPurchase ? (product?.purchaseCost == null ? '' : String(product.purchaseCost)) : String(product?.price ?? '') });
   };
   const submit = async event => {
-    event.preventDefault(); setError('');
-    if (lines.some(line => !line.productId || !Number.isSafeInteger(Number(line.quantity)) || Number(line.quantity) <= 0 || !Number.isFinite(Number(line.price)) || Number(line.price) < 0 || Math.round(Number(line.price) * 100) !== Number(line.price) * 100)) { setError('Selecciona productos y verifica cantidades y precios con hasta dos decimales.'); return; }
+    event.preventDefault();
+    if (busy || draftPending) return;
+    setError('');
+    if (lines.some(line => !validLine(line))) { setError('Selecciona productos y verifica cantidades y precios con hasta dos decimales.'); return; }
     if (new Set(lines.map(line => line.productId)).size !== lines.length) { setError('Cada producto debe aparecer una sola vez; actualiza su cantidad en la misma línea.'); return; }
     let supplier = { id: supplierId || null, name: customer };
     if (isPurchase) {
@@ -150,24 +172,24 @@ function OperationForm({ kind, products, suppliers, busy, serverError, pending, 
   };
   const selectable = products.filter(product => !lines.some(line => line.productId === String(product.id)));
   return <div className={s.backdrop} role="presentation"><section className={s.dialog} role="dialog" aria-modal="true" aria-labelledby="operation-title">
-    <header className={s.dialogHeader}><div><span className={s.eyebrow}>{isPurchase ? 'ENTRADA DE MERCADERÍA' : 'SALIDA POR VENTA'}</span><h2 id="operation-title">Nueva {isPurchase ? 'compra' : 'venta'}</h2><p>Al guardar quedará pendiente. El stock cambia al {isPurchase ? 'recibir la compra' : 'confirmar la venta'}.</p></div><button type="button" className={s.iconButton} onClick={onClose} disabled={busy} aria-label="Cerrar"><X size={19} /></button></header>
+    <header className={s.dialogHeader}><div><span className={s.eyebrow}>{isPurchase ? 'ENTRADA DE MERCADERÍA' : 'SALIDA POR VENTA'}</span><h2 id="operation-title">Nueva {isPurchase ? 'compra' : 'venta'}</h2><p>Al guardar quedará pendiente. El stock cambia al {isPurchase ? 'recibir la compra' : 'confirmar la venta'}.</p></div><button type="button" className={s.iconButton} onClick={onClose} disabled={busy || draftPending} aria-label="Cerrar"><X size={19} /></button></header>
     <form onSubmit={submit}>
-      <div className={s.formGrid}><label>Fecha<input type="date" value={date} required onChange={e => setDate(e.target.value)} /></label><label>Documento de referencia<input maxLength="120" value={reference} onChange={e => setReference(e.target.value)} placeholder="Factura, boleta…" /></label>
-      {isPurchase ? <label className={s.wide}>Proveedor<select value={newSupplier ? '__new__' : supplierId} onChange={e => { setNewSupplier(e.target.value === '__new__'); setSupplierId(e.target.value === '__new__' ? '' : e.target.value); }} required><option value="">Selecciona proveedor</option>{suppliers.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}<option value="__new__">+ Agregar proveedor nuevo</option></select>{newSupplier && <input className={s.extraField} value={supplierName} maxLength="180" onChange={e => setSupplierName(e.target.value)} placeholder="Nombre del proveedor" required />}</label>
-        : <label className={s.wide}>Cliente (opcional)<input maxLength="180" value={customer} onChange={e => setCustomer(e.target.value)} placeholder="Público general" /></label>}
+      <div className={s.formGrid}><label>Fecha<input disabled={draftPending} type="date" value={date} required onChange={e => setDate(e.target.value)} /></label><label>Documento de referencia<input disabled={draftPending} maxLength="120" value={reference} onChange={e => setReference(e.target.value)} placeholder="Factura, boleta…" /></label>
+      {isPurchase ? <label className={s.wide}>Proveedor<select disabled={draftPending} value={newSupplier ? '__new__' : supplierId} onChange={e => { setNewSupplier(e.target.value === '__new__'); setSupplierId(e.target.value === '__new__' ? '' : e.target.value); }} required><option value="">Selecciona proveedor</option>{suppliers.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}<option value="__new__">+ Agregar proveedor nuevo</option></select>{newSupplier && <input disabled={draftPending} className={s.extraField} value={supplierName} maxLength="180" onChange={e => setSupplierName(e.target.value)} placeholder="Nombre del proveedor" required />}</label>
+        : <label className={s.wide}>Cliente (opcional)<input disabled={draftPending} maxLength="180" value={customer} onChange={e => setCustomer(e.target.value)} placeholder="Público general" /></label>}
       </div>
-      <div className={s.linesHeading}><h3>Productos</h3><button type="button" className={s.secondary} onClick={() => setLines(previous => [...previous, { productId: '', quantity: '1', price: '' }])} disabled={busy || !selectable.length}><Plus size={15} /> Agregar línea</button></div>
+      <div className={s.linesHeading}><h3>Productos</h3><button type="button" className={s.secondary} onClick={() => setLines(previous => [...previous, { productId: '', quantity: '1', price: '' }])} disabled={busy || draftPending || !selectable.length}><Plus size={15} /> Agregar línea</button></div>
       <div className={s.lineList}>{lines.map((line, index) => { const product = products.find(item => String(item.id) === line.productId); return <div className={s.line} key={index}>
-        <label className={s.productField}>Producto<select required value={line.productId} onChange={e => selectProduct(index, e.target.value)}><option value="">Selecciona producto</option>{product && <option value={line.productId}>{product.name} · {product.sku}</option>}{selectable.map(item => <option key={item.id} value={String(item.id)}>{item.name} · {item.sku}</option>)}</select>{product && <small>{isPurchase ? `Stock actual: ${quantity(product.stock)}` : `Disponible: ${quantity(product.stock)}`}</small>}{!isPurchase && product && Number(line.quantity) > product.stock && <small className={s.stockWarning}>Stock insuficiente para confirmar; la venta quedará pendiente.</small>}</label>
-        <label>Cantidad<input type="number" min="1" step="1" required value={line.quantity} onChange={e => updateLine(index, { quantity: e.target.value })} /></label>
-        <label>{isPurchase ? 'Costo unitario' : 'Precio unitario'}<input type="number" min="0" step="0.01" required value={line.price} onChange={e => updateLine(index, { price: e.target.value })} /></label>
-        <div className={s.lineSubtotal}><small>Subtotal</small><strong>{currency((Number(line.quantity) || 0) * (Number(line.price) || 0))}</strong><button type="button" className={s.removeLine} aria-label="Quitar producto" disabled={lines.length === 1} onClick={() => setLines(previous => previous.filter((_, i) => i !== index))}><X size={16} /></button></div>
+        <label className={s.productField}>Producto<select disabled={draftPending} required value={line.productId} onChange={e => selectProduct(index, e.target.value)}><option value="">Selecciona producto</option>{product && <option value={line.productId}>{product.name} · {product.sku}</option>}{selectable.map(item => <option key={item.id} value={String(item.id)}>{item.name} · {item.sku}</option>)}</select>{product && <small>{isPurchase ? `Stock actual: ${quantity(product.stock)}` : `Disponible: ${quantity(product.stock)}`}</small>}{!isPurchase && product && Number(line.quantity) > product.stock && <small className={s.stockWarning}>Stock insuficiente para confirmar; la venta quedará pendiente.</small>}</label>
+        <label>Cantidad<input disabled={draftPending} type="number" min="1" step="1" required value={line.quantity} onChange={e => updateLine(index, { quantity: e.target.value })} /></label>
+        <label>{isPurchase ? 'Costo unitario' : 'Precio unitario'}<input disabled={draftPending} type="number" min="0" step="0.01" required value={line.price} onChange={e => updateLine(index, { price: e.target.value })} /></label>
+        <div className={s.lineSubtotal}><small>Subtotal</small><strong>{currency((Number(line.quantity) || 0) * (Number(line.price) || 0))}</strong><button type="button" className={s.removeLine} aria-label="Quitar producto" disabled={draftPending || lines.length === 1} onClick={() => setLines(previous => previous.filter((_, i) => i !== index))}><X size={16} /></button></div>
       </div>; })}</div>
-      <label className={s.notes}>Observaciones<textarea maxLength="1000" rows="2" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notas opcionales" /></label>
+      <label className={s.notes}>Observaciones<textarea disabled={draftPending} maxLength="1000" rows="2" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notas opcionales" /></label>
       <div className={s.totalRow}><span>Total del documento</span><strong>{currency(total)}</strong></div>
       {error && <p className={s.errorText} role="alert">{error}</p>}
       {(serverError || pending) && <p className={s.errorText} role="alert">{serverError || 'El servidor pudo haber recibido la solicitud.'}{pending && <> Reintenta el mismo envío para confirmar sin duplicar. <button type="button" className={s.secondary} disabled={busy} onClick={async () => { const sent = await onRetry(); if (sent?.kind === 'supplier') { setSupplierId(sent.id); setSupplierName(''); setNewSupplier(false); } }}>Reintentar la misma solicitud</button></>}</p>}
-    <footer className={s.dialogActions}><button type="button" className={s.secondary} onClick={onClose} disabled={busy}>Cancelar</button><button type="submit" className={s.primary} disabled={busy || !lines.length}>{busy ? 'Guardando…' : 'Guardar como pendiente'}</button></footer>
+    <footer className={s.dialogActions}><button type="button" className={s.secondary} onClick={onClose} disabled={busy || draftPending}>Cancelar</button><button type="submit" className={s.primary} disabled={busy || draftPending || !lines.length}>{busy ? 'Guardando…' : 'Guardar como pendiente'}</button></footer>
     </form>
   </section></div>;
 }

@@ -4,14 +4,144 @@ begin;
 set local lock_timeout = '5s';
 
 do $preflight$
+declare
+  dependency record;
+  relation oid;
+  routine oid;
+  client_role text;
+  sales oid;
+  members oid;
+  products oid;
+  users oid;
 begin
-  if to_regprocedure('public.inventory_register_stock(uuid,bigint,bigint,text,integer,text)') is null
-    or to_regprocedure('public.inventory_register_sale(uuid,bigint,bigint,integer,numeric)') is null
-    or to_regclass('public.inventory_sales') is null
-    or to_regclass('public.inventory_members') is null
-    or has_schema_privilege('authenticated','public','CREATE')
-    or has_schema_privilege('anon','public','CREATE') then
-    raise exception 'COMMERCE_SCHEMA_DRIFT: aplicar antes las fases de stock y ventas y revisar permisos de public';
+  if not coalesce(has_schema_privilege(current_user,to_regnamespace('public'),'USAGE'),false)
+    or not coalesce(has_schema_privilege(current_user,to_regnamespace('public'),'CREATE'),false)
+    or not coalesce(has_schema_privilege(current_user,to_regnamespace('auth'),'USAGE'),false) then
+    raise exception 'COMMERCE_PERMISSION_DRIFT: % requiere USAGE/CREATE en public y USAGE en auth', current_user;
+  end if;
+  sales := to_regclass('public.inventory_sales');
+  members := to_regclass('public.inventory_members');
+  products := to_regclass('public.products');
+  users := to_regclass('auth.users');
+  if to_regrole('anon') is null or to_regrole('authenticated') is null then
+    raise exception 'COMMERCE_SCHEMA_DRIFT: se requieren los roles anon y authenticated';
+  end if;
+  for dependency in select * from (values
+    ('public.inventory_write_enabled()', 'boolean'::regtype),
+    ('public.inventory_stock_enabled()', 'boolean'::regtype),
+    ('public.inventory_sales_enabled()', 'boolean'::regtype),
+    ('public.inventory_register_stock(uuid,bigint,bigint,text,integer,text)', 'jsonb'::regtype),
+    ('public.inventory_register_sale(uuid,bigint,bigint,integer,numeric)', 'jsonb'::regtype),
+    ('auth.uid()', 'uuid'::regtype)
+  ) as required(signature, result_type) loop
+    routine := to_regprocedure(dependency.signature);
+    if not exists (select 1 from pg_proc where oid=routine and prokind='f'
+      and not proretset and prorettype=dependency.result_type) then
+      raise exception 'COMMERCE_SCHEMA_DRIFT: falta o es incompatible %', dependency.signature;
+    end if;
+    if not has_function_privilege(current_user,routine,'EXECUTE') then
+      raise exception 'COMMERCE_PERMISSION_DRIFT: % requiere EXECUTE en %', current_user, dependency.signature;
+    end if;
+    if dependency.result_type='boolean'::regtype and not has_function_privilege('authenticated',routine,'EXECUTE') then
+      raise exception 'COMMERCE_PERMISSION_DRIFT: authenticated requiere EXECUTE en %', dependency.signature;
+    end if;
+  end loop;
+
+  for dependency in select * from (values
+    ('public.products', products),
+    ('public.inventory_members', members),
+    ('public.inventory_sales', sales),
+    ('auth.users', users)
+  ) as required(table_name, table_oid) loop
+    if not exists (select 1 from pg_class where oid=dependency.table_oid and relkind in ('r','p')) then
+      raise exception 'COMMERCE_SCHEMA_DRIFT: falta o es incompatible %', dependency.table_name;
+    end if;
+    if row_security_active(dependency.table_oid) then
+      raise exception 'COMMERCE_PERMISSION_DRIFT: RLS se aplica a % sobre %', current_user, dependency.table_name;
+    end if;
+  end loop;
+
+  for dependency in select * from (values
+    (products, 'bigint', array['id','version','category_id']),
+    (products, 'integer', array['stock','min_stock']),
+    (products, 'numeric', array['price']),
+    (products, 'timestamptz', array['updated_at']),
+    (products, 'text', array['name','sku']),
+    (members, 'uuid', array['user_id']),
+    (sales, 'uuid', array['id','actor_id']),
+    (sales, 'bigint', array['product_id','expected_version']),
+    (sales, 'text', array['product_name','sku','movement_id','actor_email']),
+    (sales, 'integer', array['quantity']),
+    (sales, 'numeric', array['unit_price','total']),
+    (sales, 'timestamptz', array['created_at']),
+    (sales, 'jsonb', array['rpc_result']),
+    (users, 'uuid', array['id']),
+    (users, 'text', array['email'])
+  ) as required(table_oid, type_name, column_names) loop
+    if exists (select 1 from unnest(dependency.column_names) as required_column(name)
+      where not exists (select 1 from pg_attribute where attrelid=dependency.table_oid
+        and attname=required_column.name and attnum>0 and not attisdropped
+        and (atttypid=to_regtype(dependency.type_name)
+          or (dependency.type_name='text' and atttypid='varchar'::regtype)))) then
+      raise exception 'COMMERCE_SCHEMA_DRIFT: se requiere % en %.%',
+        dependency.type_name, dependency.table_oid::regclass, dependency.column_names;
+    end if;
+  end loop;
+
+  if not exists (select 1 from pg_class where oid=sales and pg_has_role(relowner,'USAGE'))
+    or not has_table_privilege(products,'SELECT')
+    or not has_any_column_privilege(products,'UPDATE')
+    or not has_column_privilege(members,'user_id','SELECT')
+    or not has_column_privilege(sales,'id','SELECT')
+    or not has_table_privilege(sales,'UPDATE')
+    or not has_column_privilege(users,'id','SELECT')
+    or not has_column_privilege(users,'email','SELECT') then
+    raise exception 'COMMERCE_PERMISSION_DRIFT: permisos insuficientes del instalador %', current_user;
+  end if;
+
+  foreach client_role in array array['anon','authenticated'] loop
+    if has_schema_privilege(client_role,'public','CREATE')
+      or has_table_privilege(client_role,sales,'DELETE,TRUNCATE,TRIGGER')
+      or has_any_column_privilege(client_role,sales,'INSERT,UPDATE') then
+      raise exception 'COMMERCE_PERMISSION_DRIFT: % tiene CREATE en public o escritura directa en inventory_sales', client_role;
+    end if;
+    -- Los grants directos se revocan al crear cada tabla; los heredados de otros roles permanecen.
+    if exists (select 1 from pg_default_acl d cross join lateral aclexplode(d.defaclacl) acl
+      where d.defaclrole=current_user::regrole and d.defaclobjtype='r'
+        and d.defaclnamespace in (0,'public'::regnamespace)
+        and acl.grantee not in (0,'anon'::regrole,'authenticated'::regrole)
+        and acl.privilege_type in ('INSERT','UPDATE','DELETE','TRUNCATE','TRIGGER')
+        and pg_has_role(client_role,nullif(acl.grantee,0),'USAGE')) then
+      raise exception 'COMMERCE_PERMISSION_DRIFT: % heredaría escritura directa en las nuevas tablas', client_role;
+    end if;
+  end loop;
+  if not has_schema_privilege('authenticated','public','USAGE')
+    or not has_schema_privilege('authenticated','auth','USAGE')
+    or not has_function_privilege('authenticated','auth.uid()','EXECUTE')
+    or not has_column_privilege('authenticated',members,'user_id','SELECT')
+    or exists (select 1 from unnest(array['id','product_id','product_name','sku','quantity',
+      'unit_price','total','movement_id','actor_email','created_at']) as column_name
+      where not has_column_privilege('authenticated',sales,column_name,'SELECT')) then
+    raise exception 'COMMERCE_PERMISSION_DRIFT: revisar lectura de authenticated en inventory_members e inventory_sales';
+  end if;
+  foreach relation in array array[members,sales] loop
+    if not (select relrowsecurity from pg_class where oid=relation)
+      or not exists (select 1 from pg_policy p where p.polrelid=relation and p.polpermissive and p.polcmd in ('r','*')
+        and (0=any(p.polroles) or exists (select 1 from unnest(p.polroles) as policy_role
+          where pg_has_role('authenticated',nullif(policy_role,0),'USAGE')))) then
+      raise exception 'COMMERCE_PERMISSION_DRIFT: falta RLS de lectura para authenticated en %', relation::regclass;
+    end if;
+  end loop;
+
+  if exists (select 1 from pg_class where relnamespace='public'::regnamespace and relname in (
+    'inventory_suppliers','inventory_purchases','inventory_purchase_lines','inventory_sale_orders','inventory_sale_lines',
+    'inventory_purchases_created_idx','inventory_sale_orders_created_idx','inventory_purchase_lines_parent_idx',
+    'inventory_sale_lines_parent_idx','inventory_sales_order_idx'))
+    or exists (select 1 from pg_attribute where attrelid=sales and not attisdropped
+      and attname in ('sale_order_id','cancelled_at'))
+    or exists (select 1 from pg_proc where pronamespace='public'::regnamespace and proname in (
+      'inventory_commerce_enabled','inventory_supplier_save','inventory_purchase','inventory_sale_order')) then
+    raise exception 'COMMERCE_SCHEMA_DRIFT: ya existen objetos comerciales; revisar instalación previa o parcial';
   end if;
 end
 $preflight$;
@@ -109,7 +239,6 @@ begin
   end loop;
 end
 $rls$;
-revoke update(sale_order_id) on public.inventory_sales from public, anon, authenticated;
 grant select(sale_order_id) on public.inventory_sales to authenticated;
 grant select(cancelled_at) on public.inventory_sales to authenticated;
 
@@ -143,13 +272,22 @@ declare actor uuid := auth.uid(); actor_email text; header public.inventory_purc
 begin
   if actor is null or not exists(select 1 from public.inventory_members where user_id=actor)
     or public.inventory_write_enabled() is distinct from true then raise exception 'INVENTORY_FORBIDDEN' using errcode='42501'; end if;
-  if p_id is null then raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023'; end if;
+  if p_id is null or p_action is null or p_action not in ('create','receive','cancel') then
+    raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023';
+  end if;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_id::text,0));
   if p_action='create' then
-    if jsonb_typeof(p_data)<>'object' or jsonb_typeof(p_data->'lines')<>'array' or jsonb_array_length(p_data->'lines') not between 1 and 100 then raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023'; end if;
+    if jsonb_typeof(p_data) is distinct from 'object' or jsonb_typeof(p_data->'lines') is distinct from 'array' then
+      raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023';
+    end if;
+    if jsonb_array_length(p_data->'lines') not between 1 and 100 then
+      raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023';
+    end if;
     select email into actor_email from auth.users where id=actor;
     if exists(select 1 from jsonb_to_recordset(p_data->'lines') x(product_id bigint, quantity integer, unit_cost numeric, id uuid, reversal_id uuid)
-      where product_id is null or quantity is null or quantity<=0 or unit_cost is null or unit_cost<0 or unit_cost<>round(unit_cost,2) or id is null or reversal_id is null)
+      where product_id is null or product_id<=0 or quantity is null or quantity<=0
+        or unit_cost is null or unit_cost not between 0 and 9999999999.99
+        or unit_cost<>round(unit_cost,2) or id is null or reversal_id is null)
       or (select count(*) from jsonb_to_recordset(p_data->'lines') x(product_id bigint)) <> (select count(distinct product_id) from jsonb_to_recordset(p_data->'lines') x(product_id bigint)) then raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023'; end if;
     if exists(select 1 from jsonb_to_recordset(p_data->'lines') x(quantity integer,unit_cost numeric) where quantity::numeric*unit_cost>999999999999.99) then raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023'; end if;
     if exists(select 1 from jsonb_to_recordset(p_data->'lines') x(id uuid,reversal_id uuid) where id=reversal_id) then raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023'; end if;
@@ -181,7 +319,10 @@ begin
   if p_action='cancel' then
     update public.inventory_purchases set status='cancelada',cancelled_at=now() where id=p_id returning * into header;
     return jsonb_build_object('operation',to_jsonb(header));
-  elsif p_action<>'receive' then raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023'; end if;
+  end if;
+  if not exists (select 1 from public.inventory_purchase_lines where purchase_id=p_id) then
+    raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023';
+  end if;
   if public.inventory_stock_enabled() is distinct from true then raise exception 'INVENTORY_STOCK_DISABLED'; end if;
   for row_line in select * from public.inventory_purchase_lines where purchase_id=p_id order by product_id loop
     select * into product from public.products where id=row_line.product_id for update;
@@ -202,13 +343,22 @@ declare actor uuid := auth.uid(); actor_email text; header public.inventory_sale
 begin
   if actor is null or not exists(select 1 from public.inventory_members where user_id=actor)
     or public.inventory_write_enabled() is distinct from true then raise exception 'INVENTORY_FORBIDDEN' using errcode='42501'; end if;
-  if p_id is null then raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023'; end if;
+  if p_id is null or p_action is null or p_action not in ('create','confirm','cancel') then
+    raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023';
+  end if;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_id::text,0));
   if p_action='create' then
-    if jsonb_typeof(p_data)<>'object' or jsonb_typeof(p_data->'lines')<>'array' or jsonb_array_length(p_data->'lines') not between 1 and 100 then raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023'; end if;
+    if jsonb_typeof(p_data) is distinct from 'object' or jsonb_typeof(p_data->'lines') is distinct from 'array' then
+      raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023';
+    end if;
+    if jsonb_array_length(p_data->'lines') not between 1 and 100 then
+      raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023';
+    end if;
     select email into actor_email from auth.users where id=actor;
     if exists(select 1 from jsonb_to_recordset(p_data->'lines') x(product_id bigint,quantity integer,unit_price numeric,id uuid,reversal_id uuid)
-      where product_id is null or quantity is null or quantity<=0 or unit_price is null or unit_price<0 or unit_price<>round(unit_price,2) or id is null or reversal_id is null)
+      where product_id is null or product_id<=0 or quantity is null or quantity<=0
+        or unit_price is null or unit_price not between 0 and 9999999999.99
+        or unit_price<>round(unit_price,2) or id is null or reversal_id is null)
       or (select count(*) from jsonb_to_recordset(p_data->'lines') x(product_id bigint)) <> (select count(distinct product_id) from jsonb_to_recordset(p_data->'lines') x(product_id bigint)) then raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023'; end if;
     if exists(select 1 from jsonb_to_recordset(p_data->'lines') x(quantity integer,unit_price numeric) where quantity::numeric*unit_price>999999999999.99) then raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023'; end if;
     if exists(select 1 from jsonb_to_recordset(p_data->'lines') x(id uuid,reversal_id uuid) where id=reversal_id) then raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023'; end if;
@@ -239,6 +389,9 @@ begin
     return jsonb_build_object('operation',to_jsonb(header));
   end if;
   if header.status='pendiente' and p_action='confirm' then
+    if not exists (select 1 from public.inventory_sale_lines where sale_id=p_id) then
+      raise exception 'INVENTORY_INVALID_INPUT' using errcode='22023';
+    end if;
     if public.inventory_sales_enabled() is distinct from true then raise exception 'INVENTORY_SALES_DISABLED'; end if;
     for row_line in select * from public.inventory_sale_lines where sale_id=p_id order by product_id loop
       select * into product from public.products where id=row_line.product_id for update;

@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { CircleAlert, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CircleAlert, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import InventoryLoading from '../components/InventoryLoading';
 import { limaDate } from './dashboardData.js';
 import { preparePredictionView, evaluatePredictionView, predictionAvailability, methodLabels, estimateStockout } from './predictionViewData.js';
@@ -65,47 +65,62 @@ export default function Prediccion({ products = EMPTY, sales = EMPTY, salesEnabl
   const eligible = current.filter(product => product.isActive !== false && byId.get(product.id)?.eligible);
   const forecastPages = Math.max(1, Math.ceil(eligible.length / 12));
   const activeForecastPage = Math.min(forecastPage, forecastPages);
-  const cutoff = result.forecasts.find(row => row.cutoff)?.cutoff;
+  const visibleForecasts = eligible.slice((activeForecastPage - 1) * 12, activeForecastPage * 12);
+  const period = byId.get(eligible[0]?.id);
 
   if (view.state === 'loading') return <>{predictionControls && <div className={styles.loadingControls}>{predictionControls}</div>}<InventoryLoading label="Cargando predicción de demanda" /></>;
   return <div className={`${s.page} ${ui.workspace} ${styles.workspace}`}>
     {predictionNotice}
     <header className={`${s.header} ${ui.heading} ${styles.heading}`}>
       <div><h1>Predicción de demanda</h1></div>
-      {predictionControls}
-      <label className={styles.horizon} htmlFor={`${id}-horizon`}>Horizonte
-        <select id={`${id}-horizon`} value={horizon} onChange={event => {
-          setHorizon(Number(event.target.value)); setForecastPage(1);
-        }}><option value={7}>7 días</option><option value={30}>30 días</option></select>
-      </label>
-    </header>
-    <section className={`${styles.availability} ${eligible.length ? styles.available : ''}`}
-      role={['processing_error', 'connection_error', 'invalid_evidence', 'evidence_error'].includes(state) ? 'alert' : 'status'} aria-live="polite" data-prediction-state={state}>
-      {!eligible.length && <CircleAlert size={28} aria-hidden="true" />}
-      <div><h2>{eligible.length ? 'Predicciones disponibles' : 'Predicciones no disponibles'}</h2>
-        <p>{eligible.length ? `${eligible.length} productos con pronóstico para ${horizon} días.` : description}</p>
+      <div className={styles.toolbar}>
+        {predictionControls}
+        <label className={styles.horizon} htmlFor={`${id}-horizon`}>Horizonte
+          <select id={`${id}-horizon`} value={horizon} onChange={event => {
+            setHorizon(Number(event.target.value)); setForecastPage(1);
+          }}><option value={7}>7 días</option><option value={30}>30 días</option></select>
+        </label>
       </div>
-    </section>
-    {eligible.length > 0 && <section aria-label={`Pronósticos a ${horizon} días`}>
-      <div className={styles.period}>Corte: {dateLabel(cutoff)} · Días completos de America/Lima</div>
-      <div className={styles.grid}>{eligible.slice((activeForecastPage - 1) * 12, activeForecastPage * 12).map(product => {
+    </header>
+    {period ? <section aria-label={`Pronósticos a ${horizon} días`}>
+      <p className={styles.summary} role="status" data-prediction-state={state}>
+        <strong>Predicciones disponibles</strong>
+        <span>{eligible.length === 1 ? '1 producto con pronóstico' : `${eligible.length} productos con pronóstico`}</span>
+      </p>
+      <div className={styles.grid}>{visibleForecasts.map(product => {
         const forecast = byId.get(product.id);
         const risk = estimateStockout(forecast, product.stock);
         return <article key={product.id} className={styles.card} data-horizon={forecast.horizon}>
-          <h2>{product.name}</h2><p className={styles.sku}>SKU: {product.sku}</p>
-          <dl><div className={styles.demand}><dt>Demanda prevista · {forecast.horizon} días</dt><dd>{numbers.format(forecast.estimatedDemand)} <span>unidades</span></dd></div>
-            <div><dt>Stock disponible</dt><dd>{Number.isSafeInteger(product.stock) && product.stock >= 0 ? numbers.format(product.stock) : 'No disponible'}</dd></div>
-            <div><dt>Stock mínimo</dt><dd>{Number.isSafeInteger(product.minStock) && product.minStock >= 0 ? numbers.format(product.minStock) : 'No disponible'}</dd></div>
-            <div><dt>Método estadístico</dt><dd>{methodLabels[forecast.method] ?? 'No disponible'}</dd></div>
-            <div><dt>Agotamiento orientativo</dt><dd>{risk.state === 'within_horizon'
+          <header className={styles.product}><h2>{product.name}</h2></header>
+          <dl className={styles.metrics}>
+            <div className={styles.demand}>
+              <dt>Demanda prevista <span className={styles.horizonBadge}>{forecast.horizon} días</span></dt>
+              <dd>{numbers.format(forecast.estimatedDemand)} <span>unidades</span></dd>
+            </div>
+            <div className={styles.stock}><dt>Stock:</dt><dd>{Number.isSafeInteger(product.stock) && product.stock >= 0 ? numbers.format(product.stock) : 'No disponible'}</dd></div>
+            <div className={styles.stock}><dt><span className={styles.stockSeparator} aria-hidden="true">·</span>Mínimo:</dt><dd>{Number.isSafeInteger(product.minStock) && product.minStock >= 0 ? numbers.format(product.minStock) : 'No disponible'}</dd></div>
+            <div className={styles.risk}><dt><Clock size={13} aria-hidden="true" /> Agotamiento</dt><dd data-risk={risk.state}>{risk.state === 'within_horizon'
               ? risk.days === 0 ? 'Sin stock' : risk.days < 1 ? 'Menos de 1 día' : `≈ ${daysFormat.format(risk.days)} días`
-              : risk.state === 'beyond_horizon' ? 'Fuera del horizonte' : 'No estimable'}</dd></div></dl>
-          <p className={styles.note}>Del {dateLabel(forecast.from)} al {dateLabel(forecast.to)}. Estimación basada en ventas observadas.</p>
-          <p className={styles.note}>{forecast.method === 'zero_baseline' ? 'La estimación de cero se limita a este horizonte y no descarta ventas futuras.'
-            : 'El agotamiento supone consumo uniforme; no es una fecha garantizada.'}</p>
+              : risk.state === 'beyond_horizon' ? 'Fuera del horizonte' : 'No estimable'}</dd></div>
+          </dl>
+          <footer className={styles.cardDetails}>
+            <span>SKU: {product.sku}</span>
+            <span>Método: {methodLabels[forecast.method] ?? 'No disponible'}</span>
+          </footer>
         </article>;
       })}</div>
+      <footer className={styles.notes}>
+        <p>Corte al <time dateTime={period.cutoff}>{dateLabel(period.cutoff)}</time> · Del <time dateTime={period.from}>{dateLabel(period.from)}</time> al <time dateTime={period.to}>{dateLabel(period.to)}</time> · Días completos de America/Lima</p>
+        <p>{!predictionNotice && 'Estimación basada en ventas observadas. '}El agotamiento supone consumo uniforme y la fecha puede variar.</p>
+        {visibleForecasts.some(product => byId.get(product.id).method === 'zero_baseline') &&
+          <p>La estimación de cero se limita a este horizonte y no descarta ventas futuras.</p>}
+      </footer>
       <Pagination page={activeForecastPage} pages={forecastPages} setPage={setForecastPage} label="Paginación de pronósticos" />
+    </section> : <section className={styles.availability}
+      role={['processing_error', 'connection_error', 'invalid_evidence', 'evidence_error'].includes(state) ? 'alert' : 'status'} aria-live="polite" data-prediction-state={state}>
+      <CircleAlert size={22} aria-hidden="true" />
+      <h2>Predicciones no disponibles</h2>
+      <p>{description}</p>
     </section>}
   </div>;
 }

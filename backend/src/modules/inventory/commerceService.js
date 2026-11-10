@@ -21,7 +21,8 @@ async function rows(client, table, columns = '*') {
 
 export async function loadCommerce(client, userId) {
   const membership = await client.from('inventory_members').select('user_id').eq('user_id', userId).maybeSingle();
-  if (membership.error || !membership.data) throw fail('Tu cuenta no tiene acceso a las operaciones comerciales.', membership.error?.code === '42501' ? 403 : 503);
+  if (membership.error && membership.error.code !== '42501') throw fail('No se pudo verificar el acceso a las operaciones comerciales.');
+  if (membership.error || !membership.data) throw fail('Tu cuenta no tiene acceso a las operaciones comerciales.', 403);
   const enabled = await client.rpc('inventory_commerce_enabled', {}, { get: true });
   if (['PGRST202', '42883', '42P01', 'PGRST205'].includes(enabled.error?.code)) throw fail('El módulo de compras y ventas requiere aplicar la migración SQL de Supabase.', 409);
   if (enabled.error) throw fail('No se pudo validar el acceso al módulo comercial.', enabled.error.code === '42501' ? 403 : 503);

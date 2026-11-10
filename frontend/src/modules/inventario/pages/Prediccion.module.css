@@ -1,29 +1,72 @@
-.workspace { background-image:none; min-width:0; }
-.heading h1 { margin-bottom:6px; }
-.demoNotice { position:sticky; top:0; z-index:10; padding:12px 18px; margin-bottom:18px; border:1px solid #e7cd83; border-radius:10px; background:#fff4cc; color:#624400; font-size:13px; }
-.loadingControls { display:flex; justify-content:flex-end; padding:18px 24px; }
-.horizon { display:flex; align-items:center; gap:12px; font-size:12px; color:var(--ui-muted); font-weight:600; }
-.horizon select { min-width:120px; }
-.availability { padding:48px 24px; border:1px solid var(--ui-line); border-radius:14px; background:var(--ui-surface); text-align:center; margin-bottom:24px; }
-.availability > svg { display:block; margin:0 auto 16px; color:var(--inventory-danger, #bb2434); }
-.availability h2 { margin:0 0 10px; font-size:19px; font-weight:700; }
-.availability p { margin:0 auto; max-width:620px; color:var(--ui-muted); font-size:14px; line-height:1.65; }
-.available { padding:20px 24px; text-align:left; border-left:3px solid #e32636; }
-.available h2 { font-size:16px; }
-.available p { margin:0; }
-.period { margin:0 0 16px; color:var(--ui-muted); font-size:12px; }
-.grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
-.card { min-width:0; padding:24px; background:var(--ui-surface); border:1px solid var(--ui-line); border-radius:14px; overflow-wrap:anywhere; }
-.card h2 { margin:0 0 6px; font-size:17px; line-height:1.4; }
-.sku { margin:0; font-size:12px; color:var(--ui-muted); }
-.card dl { margin:22px 0 18px; }
-.card dl > div { padding:12px 0; border-bottom:1px solid var(--ui-line); }
-.card dt { font-size:12px; color:var(--ui-muted); margin-bottom:6px; }
-.card dd { margin:0; font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; }
-.card .demand { padding-top:0; padding-bottom:18px; }
-.demand dd { font-size:30px; letter-spacing:-.03em; }
-.demand dd span { font-size:12px; font-weight:500; color:var(--ui-muted); letter-spacing:normal; }
-.note { font-size:11px; line-height:1.6; color:var(--ui-muted); margin:8px 0 0; }
-.pagination { display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:12px; padding:18px 22px; color:var(--ui-muted); font-size:12px; }
-@media(max-width:1100px) { .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media(max-width:640px) { .grid { grid-template-columns:1fr; } .heading { gap:18px; } .horizon { width:100%; justify-content:space-between; } .horizon select { flex:1; max-width:180px; } .availability { padding:32px 18px; } .card { padding:20px; } .pagination { justify-content:center; padding:14px 10px; gap:8px; } }
+.workspace {
+  --prediction-red: var(--inventory-danger, #bb2434);
+  background-image: none;
+  min-width: 0;
+}
+.workspace .heading { gap: 10px 20px; margin-bottom: 12px; }
+.heading h1 { margin-block: 0; }
+.toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.horizon { display: flex; align-items: center; gap: 8px; color: var(--ui-muted); font-size: 12px; font-weight: 600; }
+.horizon select { min-width: 96px; }
+.demoNotice {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 5px 10px;
+  margin-bottom: 8px;
+  border-inline-start: 2px solid var(--prediction-red);
+  border-radius: 4px;
+  background: var(--ui-tint);
+  color: var(--prediction-red);
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: .04em;
+}
+.loadingControls { display: flex; justify-content: flex-end; padding: 18px 24px; }
+
+.summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; margin: 0 0 10px; color: var(--ui-muted); font-size: 12px; }
+.summary strong { color: var(--ui-ink); font-weight: 700; }
+.availability { padding: 28px 18px; border: 1px solid var(--ui-line); border-radius: 12px; background: var(--ui-surface); text-align: center; }
+.availability > svg { display: block; margin: 0 auto 8px; color: var(--prediction-red); }
+.availability h2 { margin: 0 0 5px; font-size: 17px; }
+.availability p { margin: 0 auto; max-width: 620px; color: var(--ui-muted); font-size: 13px; line-height: 1.55; }
+
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+.product h2 { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.35; }
+.metrics { display: grid; grid-template-columns: fit-content(52%) minmax(0, 1fr); gap: 7px 8px; margin: 0; }
+.metrics dt { color: var(--ui-muted); font-size: 12px; }
+.metrics dd { margin: 0; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.demand, .risk { grid-column: 1 / -1; }
+.demand { padding-bottom: 8px; border-bottom: 1px solid var(--ui-line); }
+.demand dt, .risk, .stock { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; }
+.horizonBadge { padding: 1px 7px; border-radius: 20px; color: var(--prediction-red); background: var(--ui-tint); font-size: 11px; font-weight: 650; }
+.demand dd { margin-top: 2px; color: var(--prediction-red); font-size: 34px; line-height: 1.05; font-weight: 750; letter-spacing: -.04em; }
+.demand dd span { color: var(--ui-muted); font-size: 12px; font-weight: 500; letter-spacing: normal; }
+.stock { gap: 2px 4px; }
+.stock dt { white-space: nowrap; }
+.stockSeparator { margin-inline-end: 8px; }
+.risk dt { display: inline-flex; align-items: center; gap: 5px; }
+.risk dd[data-risk='within_horizon'] { color: var(--prediction-red); }
+.cardDetails { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: auto; color: var(--ui-muted); font-size: 11px; }
+.notes { display: grid; gap: 2px; margin-top: 8px; color: var(--ui-muted); font-size: 11px; line-height: 1.45; }
+.notes p { margin: 0; }
+.pagination { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 0; color: var(--ui-muted); font-size: 12px; }
+
+@media (max-width: 680px) {
+  .grid { grid-template-columns: 1fr; }
+  .toolbar { width: 100%; }
+  .horizon { flex-wrap: wrap; }
+  .card { padding-inline: 13px; }
+  .pagination { justify-content: center; }
+}
