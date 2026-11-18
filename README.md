@@ -134,3 +134,29 @@ el modo en URL ni almacenamiento. Solo se ofrece con Vite en desarrollo y en un
 host de loopback; el build de producción excluye el controlador y sus fixtures.
 Los datos y pruebas se conservan en `frontend/tests/prediction-review/`; ya no se
 necesita una página ni un servidor separado para la demostración.
+
+### Análisis de video de visión
+
+Instala el soporte MP4 con `python -m pip install -r backend/yolo/requirements.txt`.
+Inicia Python (`python backend/yolo/service.py`) y la aplicación (`npm run dev`), entra a
+**Reconocimiento visual → Análisis por video**, selecciona un MP4 y procesa primero en modo
+de prueba. El límite es 100 MiB, 20 minutos, 8 MP y 3840 px por lado. Ajusta la línea en la
+vista previa y define el sentido izquierda→derecha; el sentido inverso toma el otro valor.
+`VISION_LINE_X_RATIO` (0.1–0.9) configura el valor por defecto fuera de la interfaz. Un
+track genera como máximo un evento por análisis.
+
+El archivo se borra al terminar y el modo de prueba no escribe inventario. Para operar,
+activa el modo de operación, elige explícitamente el producto y confirma cada cruce. La
+confirmación reutiliza `inventory_register_stock` por el endpoint autenticado existente,
+con control de versión, stock no negativo y `request_id` idempotente. No requiere migración
+SQL nueva. El historial conserva el motivo «Visión Artificial».
+
+El modelo reporta la clase `caja-monitor`; el nombre de clase por sí solo no demuestra
+precisión con cajas cerradas en condiciones reales. No hay un video MP4 de prueba en el
+repositorio, así que valida la grabación de estantería antes de operar. El procesamiento
+ahora se ejecuta como tarea cancelable con avance, fotogramas y tiempo transcurrido. Produce
+un MP4 anotado temporal y evidencia JPEG únicamente en los cruces. Los archivos vencen y
+se limpian después de 30 minutos. La pestaña en vivo enumera las webcams visibles para el
+navegador, solicita permiso y transmite fotogramas reducidos a Python para YOLO + ByteTrack.
+No se declara probada una cámara de Eagle Gaming. Las cámaras IP solo aparecen si el
+navegador o el sistema operativo las expone como dispositivo de video.

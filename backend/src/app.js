@@ -9,6 +9,7 @@ import { createInventoryRoutes } from './modules/inventory/inventoryRoutes.js';
 import { createAuthMiddleware } from './middleware/authMiddleware.js';
 import { checkOrigin, fail } from './utils/http.js';
 import { createVisionService } from './modules/vision/visionService.js';
+import { Readable } from 'node:stream';
 
 export function createApi(config, { clientFactory = () => createSupabaseClient(config), inventory = inventoryService, vision = createVisionService() } = {}) {
   const authService = createAuthService(config, clientFactory);
@@ -16,6 +17,23 @@ export function createApi(config, { clientFactory = () => createSupabaseClient(c
   const routes = [
     { method: 'GET', path: '/api/vision/model', handler: async ({send}) => send(200,await vision.info()) },
     { method: 'POST', path: '/api/vision/detect', handler: async ({req,res,send}) => { res.setHeader('Connection','close'); send(200,await vision.detect(req)); } },
+    { method: 'POST', path: '/api/vision/video', handler: async ({req,res,send}) => {
+      const url=new URL(req.url,'http://localhost');
+      res.setHeader('Connection','close');send(202,await vision.startVideo(req,{lineRatio:Number(url.searchParams.get('lineRatio')??.5),leftToRight:url.searchParams.get('leftToRight')??'SALIDA',rightToLeft:url.searchParams.get('rightToLeft')??'ENTRADA'}));
+    } },
+    { method: 'GET', path: '/api/vision/video/status', handler: async ({req,send}) => send(200,await vision.videoStatus(new URL(req.url,'http://localhost').searchParams.get('jobId'))) },
+    { method: 'GET', path: '/api/vision/video/result', handler: async ({req,send}) => send(200,await vision.videoResult(new URL(req.url,'http://localhost').searchParams.get('jobId'))) },
+    { method: 'POST', path: '/api/vision/video/cancel', handler: async ({req,send}) => send(200,await vision.cancelVideo(new URL(req.url,'http://localhost').searchParams.get('jobId'))) },
+    { method: 'GET', path: '/api/vision/video/output', handler: async ({req,res}) => {
+      const stream=await vision.videoOutput(new URL(req.url,'http://localhost').searchParams.get('jobId'));
+      res.writeHead(200,{'Content-Type':'video/mp4','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
+      Readable.fromWeb(stream).pipe(res);
+    } },
+    { method: 'POST', path: '/api/vision/live/reset', handler: async ({req,send}) => {
+      const url=new URL(req.url,'http://localhost');
+      send(200,await vision.liveReset({lineRatio:Number(url.searchParams.get('lineRatio')??.5),leftToRight:url.searchParams.get('leftToRight')??'SALIDA',rightToLeft:url.searchParams.get('rightToLeft')??'ENTRADA'}));
+    } },
+    { method: 'POST', path: '/api/vision/live/frame', handler: async ({req,send}) => send(200,await vision.liveFrame(req)) },
     ...createAuthRoutes(createAuthController(authService)),
     ...createInventoryRoutes(createInventoryController(inventory)),
   ];

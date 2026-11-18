@@ -1,11 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {visionFileError,visionDimensionsError,MAX_IMAGE_BYTES} from '../src/modules/inventario/pages/visionData.js';
+import {api} from '../src/api/httpClient.js';
+import {visionFileError,visionVideoFileError,visionDimensionsError,MAX_IMAGE_BYTES,MAX_VIDEO_BYTES} from '../src/modules/inventario/pages/visionData.js';
 test('visión: tipos reales, tamaño y dimensiones de las imágenes',()=>{
   for(const type of ['image/jpeg','image/png','image/webp'])assert.equal(visionFileError({type,size:100}), '');
   for(const file of [null,{type:'image/svg+xml',size:100},{type:'image/png',size:0},{type:'image/png',size:MAX_IMAGE_BYTES+1}])assert.ok(visionFileError(file));
   assert.equal(visionDimensionsError(960,1280),'');
   for(const [w,h] of [[31,100],[8193,32],[4001,4000]])assert.ok(visionDimensionsError(w,h));
+});
+test('visión: validación MP4 independiente acepta MIME vacío y variantes genéricas por extensión',()=>{
+  for(const type of ['video/mp4','','application/octet-stream','application/mp4'])
+    assert.equal(visionVideoFileError({name:'grabacion.MP4',type,size:128}), '');
+  for(const file of [null,{name:'grabacion.mov',type:'video/mp4',size:128},{name:'grabacion.mp4',type:'video/webm',size:128},
+    {name:'grabacion.mp4',type:'video/mp4',size:0},{name:'grabacion.mp4',type:'video/mp4',size:MAX_VIDEO_BYTES+1}])assert.ok(visionVideoFileError(file));
+  for(const type of ['image/jpeg','image/png','image/webp'])assert.equal(visionFileError({type,size:128}), '');
+});
+test('cliente HTTP conserva MIME separado de imagen y fuerza video/mp4 para el endpoint de video',async()=>{
+  const originalFetch=globalThis.fetch,calls=[];
+  globalThis.fetch=async(url,options)=>{calls.push({url,options});return Response.json({ok:true});};
+  try{
+    await api('/vision/video',{method:'POST',rawBody:new Blob(['mp4'],{type:'application/octet-stream'}),rawContentType:'video/mp4'});
+    await api('/vision/detect',{method:'POST',rawBody:new Blob(['image'],{type:'image/png'})});
+    assert.equal(calls[0].options.headers['Content-Type'],'video/mp4');
+    assert.equal(calls[0].url,'/api/vision/video');
+    assert.equal(calls[1].options.headers['Content-Type'],'image/png');
+    assert.equal(calls[1].url,'/api/vision/detect');
+  }finally{globalThis.fetch=originalFetch;}
 });
 
 test('IA: presentación accesible usa predicción sin simulaciones y conserva reconocimiento visual',async()=>{

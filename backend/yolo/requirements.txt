@@ -2,3 +2,5 @@
 # PyTorch CPU instalado en esta máquina: 2.14.0+cpu (dependencia de Ultralytics).
 ultralytics==8.4.146
 Pillow==12.3.0
+opencv-python-headless>=4.10,<5
+lap>=0.5.12

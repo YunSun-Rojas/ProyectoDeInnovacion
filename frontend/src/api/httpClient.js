@@ -1,8 +1,8 @@
-export async function api(path, { method = 'GET', body, rawBody, signal } = {}) {
+export async function api(path, { method = 'GET', body, rawBody, rawContentType, signal } = {}) {
   let response;
   try {
     response = await fetch(`/api${path}`, { method, credentials: 'same-origin', signal,
-      headers: rawBody !== undefined ? { 'Content-Type': rawBody.type } : body === undefined ? {} : { 'Content-Type': 'application/json' },
+      headers: rawBody !== undefined ? { 'Content-Type': rawContentType || rawBody.type } : body === undefined ? {} : { 'Content-Type': 'application/json' },
       ...(rawBody !== undefined ? { body: rawBody } : body === undefined ? {} : { body: JSON.stringify(body) }) });
   } catch (error) {
     if (error.name === 'AbortError') throw error;
